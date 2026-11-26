@@ -2,6 +2,8 @@
 //!
 //! 组件用到的时长也在这里：页面与弹窗只读常量，不自己定义节奏。
 
+use super::SpringPreset;
+
 /// 按键消抖时间。
 pub(crate) const KEY_DEBOUNCE_MS: u32 = 20;
 /// 长按重复的首次延迟。
@@ -42,3 +44,16 @@ pub(crate) const ROW_GAP: i16 = 2;
 pub(crate) const ROW_PITCH: i16 = ROW_HEIGHT + ROW_GAP;
 /// 页面切换时旧页面的视差位移。
 pub(crate) const PAGE_PARALLAX: i16 = 32;
+
+/// 弹簧积分的固定子步长（毫秒）。
+pub(crate) const SPRING_SUBSTEP_MS: i32 = 8;
+/// 一帧最多积分的子步数。
+pub(crate) const SPRING_MAX_SUBSTEPS: i32 = 4;
+/// 轻快：响应 0.26 s、阻尼比 0.5，分段选择框滑动用。
+pub(crate) const SPRING_CHIP: SpringPreset = SpringPreset::new(19132, 792);
+/// 弹跳：响应 0.45 s、阻尼比 0.5，游标框与位方片翻转用。
+pub(crate) const SPRING_BOUNCY: SpringPreset = SpringPreset::new(6385, 458);
+/// 跑马灯滚到一端后停留的时长（毫秒）。
+pub(crate) const MARQUEE_HOLD_MS: u32 = 900;
+/// 跑马灯匀速移动的速度（像素每秒）。
+pub(crate) const MARQUEE_SPEED_PX_S: i32 = 24;

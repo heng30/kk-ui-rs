@@ -1,8 +1,9 @@
 # kk-ui-rs
 
 [KK_UI](https://gitee.com/keysking/kk_ui) 的 Rust 移植：单色菜单 UI 运行时。
-提供首页图标选择器、可嵌套菜单、只读信息页、应用自绘页、整数/开关编辑器、确认框、
-消息框与 Toast，动画曲线与 C 版一致。画布尺寸由应用决定，布局固定 16px 行高，屏越高菜单能显示的行越多。
+提供首页图标选择器、可嵌套菜单、只读信息页、应用自绘页、整数/开关编辑器、分段单选行、
+位掩码行、枚举选择弹窗、确认框、消息框与 Toast；画布尺寸由应用决定，布局固定 16px 行高，
+屏越高菜单能显示的行越多。交互只有上/下/确定三个键，新组件的滑动与滚动用定点弹簧驱动。
 
 ```text
 应用页面与业务（本 crate 之外）
@@ -13,6 +14,53 @@
       ↓
 显示驱动（由应用实现）
 ```
+
+## 菜单行里的三种取值控件
+
+除了整数编辑器与开关编辑器，菜单行还能直接摆取值控件，全部只靠上/下/确定操作：
+
+| 绑定 | 行上长什么样 | 按确定 |
+| --- | --- | --- |
+| `ChipBinding` | 右列 N 段文字，选中段套异或框 | 换下一档，末档回到首档 |
+| `BitsBinding` | 右列 N 个方片，置位画实心 | 打开位列表弹窗，上下选位、确定翻转 |
+| `ChoiceBinding` | 右列显示当前标签 | 打开枚举选择弹窗，上/下换标签，确定提交 |
+
+```rust
+kk_ui::shared! {
+    LEVEL: u8 = 1,
+    CHANNELS: u32 = 0b0101,
+    REFRESH_INDEX: u16 = 1,
+}
+
+static CHIP_LEVEL: ChipBinding = ChipBinding {
+    levels: &["低", "中", "高"],
+    value: &LEVEL,
+    changed_event: EVENT_LEVEL_CHANGED,
+};
+static BITS_CHANNELS: BitsBinding = BitsBinding {
+    title: "通道",
+    labels: &["通道一", "通道二", "通道三", "通道四"], // 位数就是名字个数，最多 8 位
+    value: &CHANNELS,
+    changed_event: EVENT_CHANNELS_CHANGED,
+};
+static CHOICE_REFRESH: ChoiceBinding = ChoiceBinding {
+    title: "刷新率",
+    labels: &["30Hz", "60Hz", "120Hz"],
+    value: &REFRESH_INDEX,
+    changed_event: EVENT_REFRESH_CHANGED,
+};
+```
+
+`BitsBinding` 的位是多选：确定打开一列带名字的方片，上下选位（跳过某位不会翻转它），
+确定翻转当前位；走到列表尽头时方向键会把焦点交给按钮，末位按确定也会顺手交棒，
+所以一路按确定同样能提交出去。屏矮时弹窗只显示得下几行，其余靠滚动。
+
+组件的翻动、滑动都有动画：选中框在段之间滑动（`SPRING_CHIP`），位方片从中心弹开、
+游标框滑到下一位（`SPRING_BOUNCY`），弹窗里新旧标签纵向滚动。弹簧在 `ui/spring.rs`，
+是 Q8 定点的半隐式欧拉积分，参数按 SwiftUI 的 Response / Damping 预乘好，不用浮点。
+
+菜单里放不下的一行文字由跑马灯处理：当前焦点行先停一下，按每秒 24 像素匀速滑到尾部，
+停一下再匀速回位（匀速，不是缓动）。
 
 ## 依赖
 

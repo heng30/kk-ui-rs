@@ -2,7 +2,9 @@
 //!
 //! 这些状态由 [`crate::ui::Runtime`] 持有，读写都在 `widgets::dialog` 里。
 
-use crate::model::{BoolBinding, ConfirmDesc, EVENT_NONE, EventId, IntBinding};
+use crate::model::{
+    BitsBinding, BoolBinding, ChoiceBinding, ConfirmDesc, EVENT_NONE, EventId, IntBinding,
+};
 use crate::ui::Q12_ONE;
 
 /// 覆盖层类型。
@@ -14,6 +16,10 @@ pub(crate) enum OverlayType {
     Int,
     /// 开关编辑器。
     Bool,
+    /// 枚举选择弹窗。
+    Choice,
+    /// 位掩码弹窗。
+    Bits,
     /// 确认框。
     Confirm,
     /// 消息框。
@@ -38,6 +44,10 @@ pub(crate) enum Row {
     Int(&'static IntBinding),
     /// 开关编辑器绑定。
     Bool(&'static BoolBinding),
+    /// 枚举选择绑定。
+    Choice(&'static ChoiceBinding),
+    /// 位掩码绑定。
+    Bits(&'static BitsBinding),
     /// 确认框描述。
     Confirm(&'static ConfirmDesc),
 }
@@ -83,6 +93,10 @@ pub(crate) struct Overlay {
     pub value_direction: i8,
     /// 是否处于取值编辑态。
     pub editing: bool,
+    /// 位掩码弹窗里游标所在的位。
+    pub cursor: u8,
+    /// 位掩码弹窗里第一个可见的位。
+    pub top: u8,
     /// 是否正在播关闭动画。
     pub closing: bool,
     /// 焦点框是否正在补间。
@@ -113,6 +127,8 @@ impl Overlay {
         value_q12: Q12_ONE,
         value_direction: 0,
         editing: false,
+        cursor: 0,
+        top: 0,
         closing: false,
         focus_moving: false,
         value_moving: false,

@@ -1,7 +1,7 @@
 //! 应用描述表校验。
 
 use super::Runtime;
-use crate::model::{App, EVENT_NONE, MenuAction, PageRoute};
+use crate::model::{App, EVENT_NONE, MAX_BITS, MenuAction, PageRoute};
 
 impl Runtime<'_> {
     /// 检查应用描述表，返回第一处不一致的位置。
@@ -35,6 +35,20 @@ impl Runtime<'_> {
                             MenuAction::Page(_) | MenuAction::Int(_) | MenuAction::Bool(_) => true,
                             MenuAction::Confirm(_) => true,
                             MenuAction::Event(event) => event != EVENT_NONE,
+                            MenuAction::Chip(binding) => {
+                                !binding.levels.is_empty()
+                                    && (binding.value.get() as usize) < binding.levels.len()
+                            }
+                            MenuAction::Bits(binding) => {
+                                let count = binding.labels.len();
+                                !binding.labels.is_empty()
+                                    && count <= MAX_BITS as usize
+                                    && binding.value.get() >> count == 0
+                            }
+                            MenuAction::Choice(binding) => {
+                                !binding.labels.is_empty()
+                                    && (binding.value.get() as usize) < binding.labels.len()
+                            }
                         };
                         if !valid {
                             return Err((Some(*route), index as u16));

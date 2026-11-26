@@ -2,13 +2,14 @@
 
 use crate::gfx::{DrawMode, Frame};
 use crate::model::{
-    InputAction, InputEvent, ItemState, MenuAction, MenuItem, MenuPage, PageRoute, PageType,
+    ChipBinding, InputAction, InputEvent, ItemState, MAX_BITS, MenuAction, MenuItem, MenuPage,
+    PageRoute, PageType,
 };
 use crate::ui::{
-    MENU_HEADER_HEIGHT, MENU_MS, PageState, ROW_HEIGHT, ROW_PITCH, Runtime, Status, ease_q12,
-    lerp_q12,
+    MENU_HEADER_HEIGHT, MENU_MS, PageState, ROW_HEIGHT, ROW_PITCH, Runtime, SPRING_CHIP, Status,
+    ease_q12, lerp_q12,
 };
-use crate::widgets::{dialog, utils};
+use crate::widgets::{chip, dialog, marquee, toggle, utils};
 
 /// 菜单内容区能完整显示的行数，屏越高行越多，至少一行。
 fn visible_rows(rt: &Runtime) -> u16 {
@@ -124,6 +125,27 @@ fn menu_item_to_visible(page: &MenuPage, item: u16) -> u16 {
     visible
 }
 
+/// 第一个可选中条目的可见序号；没有任何可选中条目时为 0。
+fn menu_first_selectable(page: &MenuPage) -> u16 {
+    for visible in 0..menu_visible_count(page) {
+        if menu_item_selectable(page, menu_visible_to_item(page, visible)) {
+            return visible;
+        }
+    }
+    0
+}
+
+/// 选中第一个可选中条目时，窗口要回到列表顶。
+///
+/// 顶上可能有禁用条目（例如没有背光控制的「屏幕亮度」）：它们选不中，滚出去以后
+/// 只能靠这里把窗口拉回来，否则再也看不见。
+fn menu_home_top(page: &MenuPage, visible: u16, rows: u16) -> u16 {
+    if visible != menu_first_selectable(page) {
+        return u16::MAX;
+    }
+    visible.saturating_sub(rows.saturating_sub(1))
+}
+
 /// 条目是否可选中；虚拟返回项永远可选中。
 fn menu_item_selectable(page: &MenuPage, item: u16) -> bool {
     item == page.items.len() as u16 || menu_item_state(page, item) == ItemState::Normal
@@ -164,9 +186,12 @@ pub(crate) fn menu_repair_focus(rt: &Runtime, state: &mut PageState) {
     } else if visible >= state.top + visible_rows(rt) {
         state.top = visible - (visible_rows(rt) - 1);
     }
-    let visible_count = menu_visible_count(page);
-    let max_top = visible_count.saturating_sub(visible_rows(rt));
-    state.top = state.top.min(max_top);
+    let rows = visible_rows(rt);
+    let max_top = menu_visible_count(page).saturating_sub(rows);
+    state.top = state
+        .top
+        .min(max_top)
+        .min(menu_home_top(page, visible, rows));
     state.scroll_q8 = state.top as i32 * ROW_PITCH as i32 * 256;
     state.focus_q8 = (visible - state.top) as i32 * ROW_PITCH as i32 * 256;
 }
@@ -232,8 +257,13 @@ fn menu_move(rt: &mut Runtime, direction: i16, steps: u16, now: u32) {
     } else if visible >= rt.current.top + visible_rows(rt) {
         rt.current.top = visible - (visible_rows(rt) - 1);
     }
-    let max_top = count.saturating_sub(visible_rows(rt));
-    rt.current.top = rt.current.top.min(max_top);
+    let rows = visible_rows(rt);
+    let max_top = count.saturating_sub(rows);
+    rt.current.top = rt
+        .current
+        .top
+        .min(max_top)
+        .min(menu_home_top(page, visible, rows));
     rt.current.scroll_q8 = rt.current.top as i32 * ROW_PITCH as i32 * 256;
     rt.current.focus_q8 = (visible - rt.current.top) as i32 * ROW_PITCH as i32 * 256;
     rt.list_anim.scroll_from_q8 = old_scroll;
@@ -264,6 +294,9 @@ fn menu_activate(rt: &mut Runtime, now: u32) {
         MenuAction::Page(target) => rt.navigate_to(target, now),
         MenuAction::Int(index) => dialog::open_int(rt, index, now),
         MenuAction::Bool(index) => dialog::open_bool(rt, index, now),
+        MenuAction::Chip(binding) => chip_cycle(rt, binding, index),
+        MenuAction::Bits(binding) => dialog::open_bits(rt, binding, now),
+        MenuAction::Choice(binding) => dialog::open_choice(rt, binding, now),
         MenuAction::Confirm(index) => dialog::open_confirm(rt, index, now),
         MenuAction::Event(event) => {
             if rt.queue_event(event) {
@@ -276,6 +309,58 @@ fn menu_activate(rt: &mut Runtime, now: u32) {
     if status != Status::Ok && status != Status::Busy {
         menu_reject(rt, status, index);
     }
+}
+
+/// 分段行换一档：先占事件队列，队列满就不改值。
+///
+/// 滑动框的目标在这里设好、由绘制侧每帧推进，所以按下去这一帧就开始滑。
+fn chip_cycle(rt: &mut Runtime, binding: &'static ChipBinding, row: u16) -> Status {
+    let count = binding.levels.len() as u8;
+    if count == 0 {
+        return Status::Ok;
+    }
+    let previous = binding.value.get() % count;
+    let next = (previous + 1) % count;
+    if !dialog::event_or_reject(rt, binding.changed_event) {
+        return Status::Ok;
+    }
+    binding.value.set(next);
+    let right = rt.frame.width() - 7;
+    let (left, segment) = chip::layout(&rt.frame, binding.levels, right);
+    if rt.chip.row != row {
+        rt.chip.row = row;
+        rt.chip
+            .pill
+            .jump(chip::segment_x(left, segment, previous) as i32 * 256);
+    }
+    rt.chip
+        .pill
+        .set(chip::segment_x(left, segment, next) as i32 * 256);
+    rt.dirty = true;
+    Status::Ok
+}
+
+/// 画一行的标签；只有当前焦点行会滚，放不下时由跑马灯横向滚动。
+fn draw_row_label(
+    rt: &mut Runtime,
+    text: &str,
+    x: i16,
+    y: i16,
+    available: i16,
+    row: u16,
+    focused: bool,
+) {
+    let overflow = rt.frame.text_width(text) as i16 + 2 - available;
+    let offset = if focused {
+        let offset = marquee::advance(&mut rt.marquee, row, rt.last_update, overflow);
+        if overflow > 0 {
+            rt.dirty = true;
+        }
+        offset
+    } else {
+        0
+    };
+    rt.frame.draw_text(x + offset, y, text);
 }
 
 /// 菜单输入。
@@ -311,6 +396,11 @@ fn menu_value<'a>(rt: &Runtime, item: &MenuItem, buffer: &'a mut [u8; 20]) -> &'
                 rt.app.texts.off_text
             }
         }
+        MenuAction::Choice(binding) => binding
+            .labels
+            .get(binding.value.get() as usize)
+            .copied()
+            .unwrap_or(""),
         _ => "",
     }
 }
@@ -385,9 +475,85 @@ pub(crate) fn menu_draw(
             continue;
         }
         let item = &page.items[item_index as usize];
+        let normal = menu_item_state(page, item_index) == ItemState::Normal;
+        let focused = is_current && item_index == state.selected;
         let mut buffer = [0u8; 20];
         let value = menu_value(rt, item, &mut buffer);
-        if !value.is_empty() {
+        if let MenuAction::Chip(binding) = item.action {
+            let right = screen_width - if normal { 7 } else { 18 } + x_offset;
+            let (left, segment) = chip::layout(&rt.frame, binding.levels, right);
+            let count = binding.levels.len() as u8;
+            if is_current && count != 0 {
+                let selected = binding.value.get() % count;
+                let target = chip::segment_x(left, segment, selected) as i32 * 256;
+                if rt.chip.row != item_index {
+                    rt.chip.row = item_index;
+                    rt.chip.pill.jump(target);
+                }
+                rt.chip.pill.set(target);
+                if rt.chip.pill.step(rt.dt_ms, SPRING_CHIP) {
+                    rt.dirty = true;
+                }
+            }
+            menu_content_clip(
+                rt,
+                8 + x_offset,
+                left - 2,
+                clip_x,
+                clip_right,
+                content_height,
+            );
+            draw_row_label(
+                rt,
+                item.label,
+                8 + x_offset,
+                y,
+                left - 2 - (8 + x_offset),
+                item_index,
+                focused,
+            );
+            rt.frame
+                .set_clip(clip_x, MENU_HEADER_HEIGHT, clip_width, content_height);
+            chip::draw(
+                &mut rt.frame,
+                binding.levels,
+                right,
+                y,
+                ROW_HEIGHT as u16,
+                rt.chip.pill.value_q8(),
+            );
+        } else if let MenuAction::Bits(binding) = item.action {
+            let count = binding.labels.len().min(MAX_BITS as usize) as u8;
+            let right = screen_width - if normal { 7 } else { 18 } + x_offset;
+            let left = toggle::layout(right, count);
+            menu_content_clip(
+                rt,
+                8 + x_offset,
+                left - 2,
+                clip_x,
+                clip_right,
+                content_height,
+            );
+            draw_row_label(
+                rt,
+                item.label,
+                8 + x_offset,
+                y,
+                left - 2 - (8 + x_offset),
+                item_index,
+                focused,
+            );
+            rt.frame
+                .set_clip(clip_x, MENU_HEADER_HEIGHT, clip_width, content_height);
+            toggle::draw(
+                &mut rt.frame,
+                binding.value.get(),
+                count,
+                right,
+                y,
+                ROW_HEIGHT as u16,
+            );
+        } else if !value.is_empty() {
             // 取值文本要活着画完；借不到 &'static，先复制进局部缓冲再画。
             let mut text = [0u8; 20];
             let len = value.len().min(text.len());
@@ -407,7 +573,15 @@ pub(crate) fn menu_draw(
                 clip_right,
                 content_height,
             );
-            rt.frame.draw_text(8 + x_offset, y, item.label);
+            draw_row_label(
+                rt,
+                item.label,
+                8 + x_offset,
+                y,
+                value_x - 2 - (8 + x_offset),
+                item_index,
+                focused,
+            );
             rt.frame
                 .set_clip(clip_x, MENU_HEADER_HEIGHT, clip_width, content_height);
             rt.frame.draw_text(value_x, y, value);
@@ -420,12 +594,20 @@ pub(crate) fn menu_draw(
                 clip_right,
                 content_height,
             );
-            rt.frame.draw_text(8 + x_offset, y, item.label);
+            draw_row_label(
+                rt,
+                item.label,
+                8 + x_offset,
+                y,
+                screen_width - 22 - 8,
+                item_index,
+                focused,
+            );
             rt.frame
                 .set_clip(clip_x, MENU_HEADER_HEIGHT, clip_width, content_height);
             draw_enter_arrow(&mut rt.frame, screen_width - 18 + x_offset, y, false);
         } else {
-            let right = if menu_item_state(page, item_index) == ItemState::Normal {
+            let right = if normal {
                 screen_width - 7
             } else {
                 screen_width - 18
@@ -438,7 +620,15 @@ pub(crate) fn menu_draw(
                 clip_right,
                 content_height,
             );
-            rt.frame.draw_text(8 + x_offset, y, item.label);
+            draw_row_label(
+                rt,
+                item.label,
+                8 + x_offset,
+                y,
+                right - 8,
+                item_index,
+                focused,
+            );
             rt.frame
                 .set_clip(clip_x, MENU_HEADER_HEIGHT, clip_width, content_height);
         }

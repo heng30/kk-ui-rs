@@ -3,7 +3,9 @@
 //! 一种弹窗一个文件：`int_editor`、`bool_editor`、`confirm`、`message`；贴底提示条在
 //! `toast`，共用的文本绘制与整数格式化在 `text`。这里只保留与弹窗类型无关的部分。
 
+mod bits_editor;
 mod bool_editor;
+mod choice_editor;
 mod confirm;
 mod int_editor;
 mod message;
@@ -11,14 +13,16 @@ mod state;
 mod toast;
 
 use crate::gfx::{DrawMode, Frame};
-use crate::model::{EVENT_NONE, EventId, InputAction, InputEvent, PageType};
+use crate::model::{EVENT_NONE, EventId, InputAction, InputEvent, MAX_BITS, PageType};
 use crate::ui::{
     BOOL_VALUE_MS, DIALOG_CLOSE_MS, DIALOG_OPEN_MS, FOCUS_MS, INT_VALUE_MS, MENU_HEADER_HEIGHT,
-    Q12_ONE, Runtime, Status, ease_q12, lerp_q12, round_q8,
+    Q12_ONE, Runtime, SPRING_BOUNCY, Status, ease_q12, lerp_q12, round_q8,
 };
 use crate::widgets::utils;
 
+pub(crate) use bits_editor::open as open_bits;
 pub(crate) use bool_editor::open as open_bool;
+pub(crate) use choice_editor::open as open_choice;
 pub(crate) use confirm::open as open_confirm;
 pub(crate) use int_editor::open as open_int;
 pub(crate) use message::open as open_message;
@@ -31,9 +35,45 @@ fn dialog_left(rt: &Runtime) -> i16 {
     (rt.frame.width() - 122) / 2
 }
 
-/// 弹窗内容相对画布顶部的偏移：按 64 行高的基准布局，画布更高时垂直居中。
+/// 位掩码弹窗最多同时显示几行：屏越矮行越少，至少一行。
+fn bits_rows(rt: &Runtime) -> u16 {
+    ((rt.frame.height() - 48) / 16).clamp(1, MAX_BITS as i16) as u16
+}
+
+/// 位掩码弹窗当前显示的行数：位少时按位算，屏矮时按屏算。
+fn bits_visible(rt: &Runtime) -> i16 {
+    match rt.overlay.row {
+        Some(Row::Bits(binding)) => bits_rows(rt).min(binding.labels.len() as u16) as i16,
+        _ => 1,
+    }
+}
+
+/// 弹窗外框的最终高度：位列表按可见行数长高，其它弹窗沿用 64 行基准的 61。
+fn frame_height(rt: &Runtime) -> i16 {
+    if rt.overlay.kind == OverlayType::Bits {
+        44 + bits_visible(rt) * 16
+    } else {
+        61
+    }
+}
+
+/// 弹窗外框的最终顶边：画布更高时垂直居中。
+fn frame_y(rt: &Runtime) -> i16 {
+    ((rt.frame.height() - frame_height(rt)) / 2).max(1)
+}
+
+/// 弹窗内容相对画布顶部的偏移：标题、列表与按钮都相对它摆放。
 fn dialog_top(rt: &Runtime) -> i16 {
-    (rt.frame.height() - 64) / 2
+    frame_y(rt) - 1
+}
+
+/// 按钮行的上边（相对内容偏移）。
+fn footer_y(rt: &Runtime) -> i16 {
+    if rt.overlay.kind == OverlayType::Bits {
+        21 + bits_visible(rt) * 16 + 4
+    } else {
+        41
+    }
 }
 
 /// 弹窗出现时对齐的行号：菜单页对齐当前焦点行，其它页取屏幕中部。
@@ -55,19 +95,26 @@ fn focus_rect(rt: &Runtime, focus: DialogFocus) -> (i16, i16, i16, i16) {
     let dx = dialog_left(rt);
     let dy = dialog_top(rt);
     if rt.overlay.kind == OverlayType::Message {
-        (46 + dx, 41 + dy, 36, 16)
-    } else if focus == DialogFocus::Value {
+        return (46 + dx, 41 + dy, 36, 16);
+    }
+    if focus == DialogFocus::Value {
+        if rt.overlay.kind == OverlayType::Bits {
+            let row = rt.overlay.cursor.saturating_sub(rt.overlay.top) as i16;
+            return (15 + dx, 21 + dy + row * 16, 94, 16);
+        }
         let bool_editor = rt.overlay.kind == OverlayType::Bool;
-        (
+        return (
             if bool_editor { 29 } else { 39 } + dx,
             21 + dy,
             if bool_editor { 70 } else { 46 },
             16,
-        )
-    } else if focus == DialogFocus::Confirm {
-        (77 + dx, 41 + dy, 36, 16)
+        );
+    }
+    let y = footer_y(rt) + dy;
+    if focus == DialogFocus::Confirm {
+        (77 + dx, y, 36, 16)
     } else {
-        (15 + dx, 41 + dy, 36, 16)
+        (15 + dx, y, 36, 16)
     }
 }
 
@@ -162,7 +209,12 @@ fn begin(
         _ => DialogFocus::Value,
     };
     rt.overlay.focus_mode = focus;
-    rt.overlay.editing = matches!(kind, OverlayType::Int | OverlayType::Bool);
+    rt.overlay.editing = !matches!(
+        kind,
+        OverlayType::Confirm | OverlayType::Message | OverlayType::None
+    );
+    rt.overlay.cursor = 0;
+    rt.overlay.top = 0;
     let (x, y, width, height) = focus_rect(rt, focus);
     rt.overlay.focus = (
         x as i32 * 256,
@@ -218,18 +270,19 @@ pub(crate) fn draw_title(rt: &mut Runtime<'_>, layout: &Layout, title: &str) {
 /// 底部按钮行；`cancel` 为 `false` 时只画居中的确定键。
 pub(crate) fn draw_buttons(rt: &mut Runtime<'_>, layout: &Layout, cancel: bool) {
     layout.apply_clip(&mut rt.frame);
+    let y = footer_y(rt) + layout.dy;
     if cancel {
         utils::draw_centered(
             &mut rt.frame,
             15 + layout.dx,
-            41 + layout.dy,
+            y,
             36,
             rt.app.texts.cancel_text,
         );
         utils::draw_centered(
             &mut rt.frame,
             77 + layout.dx,
-            41 + layout.dy,
+            y,
             36,
             rt.app.texts.confirm_text,
         );
@@ -237,7 +290,7 @@ pub(crate) fn draw_buttons(rt: &mut Runtime<'_>, layout: &Layout, cancel: bool) 
         utils::draw_centered(
             &mut rt.frame,
             46 + layout.dx,
-            41 + layout.dy,
+            y,
             36,
             rt.app.texts.confirm_text,
         );
@@ -252,7 +305,9 @@ pub(crate) fn input(rt: &mut Runtime, event: InputEvent, now: u32) {
     match rt.overlay.kind {
         OverlayType::Message => message::input(rt, event, now),
         OverlayType::Confirm => confirm::input(rt, event, now),
-        OverlayType::Int | OverlayType::Bool => editor_input(rt, event, now),
+        OverlayType::Int | OverlayType::Bool | OverlayType::Choice | OverlayType::Bits => {
+            editor_input(rt, event, now)
+        }
         OverlayType::None => {}
     }
 }
@@ -260,11 +315,17 @@ pub(crate) fn input(rt: &mut Runtime, event: InputEvent, now: u32) {
 /// 两种编辑器共用的输入状态机：取值态改值，按钮态提交或取消。
 fn editor_input(rt: &mut Runtime, event: InputEvent, now: u32) {
     if rt.overlay.editing {
+        if rt.overlay.kind == OverlayType::Bits {
+            bits_editor::edit(rt, event, now);
+            return;
+        }
         if event.action == InputAction::Ok {
             rt.overlay.editing = false;
             set_focus(rt, DialogFocus::Confirm, now);
         } else if rt.overlay.kind == OverlayType::Int {
             int_editor::change(rt, event, now);
+        } else if rt.overlay.kind == OverlayType::Choice {
+            choice_editor::change(rt, event, now);
         } else {
             bool_editor::change(rt, event, now);
         }
@@ -276,13 +337,12 @@ fn editor_input(rt: &mut Runtime, event: InputEvent, now: u32) {
                 rt.overlay.editing = true;
                 rt.dirty = true;
             }
-            DialogFocus::Confirm => {
-                if rt.overlay.kind == OverlayType::Int {
-                    int_editor::commit(rt, now);
-                } else {
-                    bool_editor::commit(rt, now);
-                }
-            }
+            DialogFocus::Confirm => match rt.overlay.kind {
+                OverlayType::Int => int_editor::commit(rt, now),
+                OverlayType::Choice => choice_editor::commit(rt, now),
+                OverlayType::Bits => bits_editor::commit(rt, now),
+                _ => bool_editor::commit(rt, now),
+            },
             DialogFocus::Cancel => close(rt, now),
         }
         return;
@@ -336,6 +396,9 @@ pub(crate) fn animate(rt: &mut Runtime, now: u32) {
                 rt.overlay.focus_moving = false;
             }
         }
+        if rt.bits.pop.step(rt.dt_ms, SPRING_BOUNCY) {
+            redraw = true;
+        }
         if rt.overlay.value_moving {
             let duration = if rt.overlay.kind == OverlayType::Bool {
                 BOOL_VALUE_MS
@@ -369,7 +432,7 @@ pub(crate) fn draw(rt: &mut Runtime<'_>) {
     let x = (dx as i32 + 3 * p / one) as i16;
     let y = (rt.overlay.origin_y as i32 + (target_y - rt.overlay.origin_y as i32) * p / one) as i16;
     let width = (118 - 2 * p / one).min(screen_width as i32 - 2 * dx as i32 + 1) as i16;
-    let height = (16 + 45 * p / one) as i16;
+    let height = (16 + (frame_height(rt) as i32 - 16) * p / one) as i16;
     {
         let frame = &mut rt.frame;
         frame.reset_clip();
@@ -394,6 +457,8 @@ pub(crate) fn draw(rt: &mut Runtime<'_>) {
         OverlayType::Confirm => confirm::draw(rt, &layout),
         OverlayType::Int => int_editor::draw(rt, &layout),
         OverlayType::Bool => bool_editor::draw(rt, &layout),
+        OverlayType::Choice => choice_editor::draw(rt, &layout),
+        OverlayType::Bits => bits_editor::draw(rt, &layout),
         OverlayType::Message => message::draw(rt, &layout),
         OverlayType::None => {}
     }

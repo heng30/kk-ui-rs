@@ -6,11 +6,13 @@
 use super::input::KeyState;
 use super::nav::{self, PageTransition};
 use super::{
-    Deferred, DeferredType, EVENT_QUEUE_LENGTH, ErrorInfo, HomeAnimation, ListAnimation, PageState,
-    Status,
+    BitsAnimation, ChipAnimation, Deferred, DeferredType, EVENT_QUEUE_LENGTH, ErrorInfo,
+    HomeAnimation, ListAnimation, MarqueeState, PageState, Status,
 };
 use crate::gfx::Frame;
-use crate::model::{App, EVENT_NONE, EventId, IntBinding, ItemState, PageRoute, PageType};
+use crate::model::{
+    App, BitsBinding, EVENT_NONE, EventId, IntBinding, ItemState, PageRoute, PageType,
+};
 use crate::widgets::dialog::{Overlay, OverlayType, Row, Toast};
 use crate::widgets::pages;
 
@@ -30,6 +32,14 @@ pub struct Runtime<'a> {
     pub(crate) home_anim: HomeAnimation,
     /// 列表滚动与焦点动画。
     pub(crate) list_anim: ListAnimation,
+    /// 分段选择行的滑动框。
+    pub(crate) chip: ChipAnimation,
+    /// 位掩码行的游标与翻转反馈。
+    pub(crate) bits: BitsAnimation,
+    /// 跑马灯。
+    pub(crate) marquee: MarqueeState,
+    /// 上一次刷新到这次刷新的间隔（毫秒），弹簧按它积分。
+    pub(crate) dt_ms: i32,
     /// 覆盖层状态。
     pub(crate) overlay: Overlay,
     /// Toast 状态。
@@ -84,6 +94,10 @@ impl<'a> Runtime<'a> {
             transition: PageTransition::default(),
             home_anim: HomeAnimation::default(),
             list_anim: ListAnimation::default(),
+            chip: ChipAnimation::EMPTY,
+            bits: BitsAnimation::EMPTY,
+            marquee: MarqueeState::EMPTY,
+            dt_ms: 0,
             overlay: Overlay::EMPTY,
             toast: Toast {
                 text: "",
@@ -159,6 +173,9 @@ impl<'a> Runtime<'a> {
         self.transition.active = false;
         self.home_anim.active = false;
         self.list_anim.active = false;
+        self.chip = ChipAnimation::EMPTY;
+        self.bits = BitsAnimation::EMPTY;
+        self.marquee = MarqueeState::EMPTY;
         self.overlay = Overlay::EMPTY;
         self.toast.visible = false;
         self.toast.closing = false;
@@ -213,6 +230,19 @@ impl<'a> Runtime<'a> {
         }
         match self.overlay.row {
             Some(Row::Int(current)) if core::ptr::eq(current, binding) => Some(self.overlay.draft),
+            _ => None,
+        }
+    }
+
+    /// 读取位掩码弹窗草稿；弹窗未打开时返回 `None`。
+    pub fn get_bits_editor_draft(&self, binding: &'static BitsBinding) -> Option<u32> {
+        if !self.initialized || self.overlay.kind != OverlayType::Bits || self.overlay.closing {
+            return None;
+        }
+        match self.overlay.row {
+            Some(Row::Bits(current)) if core::ptr::eq(current, binding) => {
+                Some(self.overlay.draft as u32)
+            }
             _ => None,
         }
     }

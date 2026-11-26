@@ -1,5 +1,6 @@
 //! 页面与补间的会话状态。
 
+use super::Spring;
 use crate::model::PageRoute;
 
 /// 单页的滚动与焦点状态。
@@ -52,4 +53,60 @@ pub(crate) struct HomeAnimation {
     pub(crate) started: u32,
     /// 是否正在播放。
     pub(crate) active: bool,
+}
+
+/// 分段选择行的滑动框状态。
+#[derive(Clone, Copy)]
+pub(crate) struct ChipAnimation {
+    /// 对应的菜单条目下标；换行时用它判断要不要瞬移。
+    pub(crate) row: u16,
+    /// 选中框左边的位置，Q8 像素。
+    pub(crate) pill: Spring,
+}
+
+impl ChipAnimation {
+    /// 没有任何一行选中时的状态。
+    pub(crate) const EMPTY: Self = Self {
+        row: u16::MAX,
+        pill: Spring::REST,
+    };
+}
+
+/// 位掩码弹窗里刚翻转那一格的弹开反馈。
+#[derive(Clone, Copy)]
+pub(crate) struct BitsAnimation {
+    /// 填充进度，0 到 1 是 Q8 的 0 到 256。
+    pub(crate) pop: Spring,
+    /// 刚翻转的位；`u8::MAX` 表示没有。
+    pub(crate) pop_bit: u8,
+}
+
+impl BitsAnimation {
+    /// 静止状态。
+    pub(crate) const EMPTY: Self = Self {
+        pop: Spring::at(256),
+        pop_bit: u8::MAX,
+    };
+}
+
+/// 跑马灯状态。
+///
+/// 偏移是匀速的，所以不存位置：每次用它按阶段起点现算，掉帧也不会追不上。
+#[derive(Clone, Copy)]
+pub(crate) struct MarqueeState {
+    /// 正在滚动的条目下标。
+    pub(crate) row: u16,
+    /// 当前阶段，见 `widgets::marquee`。
+    pub(crate) phase: u8,
+    /// 当前阶段的起始时戳。
+    pub(crate) started: u32,
+}
+
+impl MarqueeState {
+    /// 静止状态。
+    pub(crate) const EMPTY: Self = Self {
+        row: u16::MAX,
+        phase: 0,
+        started: 0,
+    };
 }

@@ -2,7 +2,7 @@
 
 use kk_ui::{KEY_DOWN, KEY_OK, KkUi, PageRoute};
 
-use super::tables::{HOME_ITEMS, ROUTE_COMPONENTS, ROUTE_HOME};
+use super::tables::{BITS_CHANNELS, HOME_ITEMS, ROUTE_COMPONENTS, ROUTE_CONTROLS, ROUTE_HOME};
 
 /// 自动演示记录「哪些行打开过」用的页面槽位数，按页面编号取模。
 const AUTOPLAY_PAGES: usize = 8;
@@ -17,6 +17,8 @@ pub struct Autoplay {
     target: u16,
     /// 每个菜单页本轮已经打开过的行（按行号记位）。
     opened: [u32; AUTOPLAY_PAGES],
+    /// 位掩码弹窗里下一步按方向键还是确定。
+    bits_move: bool,
 }
 
 impl Default for Autoplay {
@@ -31,12 +33,20 @@ impl Autoplay {
         Self {
             target: 0,
             opened: [0; AUTOPLAY_PAGES],
+            bits_move: true,
         }
     }
 
     /// 决定这一拍按哪个键。
     pub fn next_key(&mut self, ui: &KkUi<'_>) -> u8 {
-        // 弹窗一律用「确定」收尾：整数/开关编辑器两下确定提交并关闭，确认框与消息框一下就关。
+        // 位掩码弹窗是一列方片，只按确定会把第 0 位来回翻、永远走不到按钮，
+        // 所以在这里按「方向键走位、确定翻转」交替操作，走到末位后确定会提交。
+        if ui.get_bits_editor_draft(&BITS_CHANNELS).is_some() {
+            self.bits_move = !self.bits_move;
+            return if self.bits_move { KEY_DOWN } else { KEY_OK };
+        }
+        // 其它弹窗一律用「确定」收尾：整数/开关/枚举编辑器两下确定提交并关闭，
+        // 确认框与消息框一下就关。
         if ui.dialog_open() {
             return KEY_OK;
         }
@@ -85,6 +95,8 @@ fn menu_item_count(page: &'static PageRoute) -> u16 {
 fn menu_slot(page: &'static PageRoute) -> usize {
     if core::ptr::eq(page, &ROUTE_COMPONENTS) {
         1
+    } else if core::ptr::eq(page, &ROUTE_CONTROLS) {
+        2
     } else {
         0
     }

@@ -231,6 +231,12 @@ pub enum MenuAction {
     Int(&'static IntBinding),
     /// 开关编辑器。
     Bool(&'static BoolBinding),
+    /// 分段单选行，按 OK 循环换档。
+    Chip(&'static ChipBinding),
+    /// 位掩码行，按 OK 翻转游标位并前进。
+    Bits(&'static BitsBinding),
+    /// 枚举选择弹窗。
+    Choice(&'static ChoiceBinding),
     /// 确认框。
     Confirm(&'static ConfirmDesc),
 }
@@ -309,6 +315,47 @@ pub struct BoolBinding {
     /// 提交后入队的事件。
     pub changed_event: EventId,
 }
+
+/// 分段单选绑定：值就是选中的段号。
+///
+/// 画在菜单行的右列，按 OK 在段之间循环，选中即生效。
+pub struct ChipBinding {
+    /// 各段的文字。
+    pub levels: &'static [&'static str],
+    /// 绑定的值。
+    pub value: &'static Shared<u8>,
+    /// 换档后入队的事件。
+    pub changed_event: EventId,
+}
+
+/// 位掩码绑定：一位一个方片，按 OK 打开弹窗逐位开关。
+///
+/// 弹窗里上/下选位、确定翻转，走到列表尽头按确定会把焦点交给按钮；提交后入队事件。
+pub struct BitsBinding {
+    /// 弹窗标题。
+    pub title: &'static str,
+    /// 每位的名字，位数就是它的长度，最多 [`MAX_BITS`]。
+    pub labels: &'static [&'static str],
+    /// 绑定的值，第 `n` 位对应第 `n` 个名字。
+    pub value: &'static Shared<u32>,
+    /// 提交后入队的事件。
+    pub changed_event: EventId,
+}
+
+/// 枚举选择绑定：值就是标签表里的下标。
+pub struct ChoiceBinding {
+    /// 标题。
+    pub title: &'static str,
+    /// 可选标签。
+    pub labels: &'static [&'static str],
+    /// 绑定的值。
+    pub value: &'static Shared<u16>,
+    /// 提交后入队的事件。
+    pub changed_event: EventId,
+}
+
+/// 一行最多放得下的方片数。
+pub const MAX_BITS: u8 = 8;
 
 /// 确认框描述。
 pub struct ConfirmDesc {

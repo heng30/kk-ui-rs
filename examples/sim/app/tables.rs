@@ -3,8 +3,8 @@
 //! 页面之间用 `&ROUTE_XXX` 句柄互相引用，`App.routes` 只是供初始化校验的无序清单。
 
 use kk_ui::{
-    App, BoolBinding, ConfirmDesc, HomeItem, HomePage, InfoPage, InfoRow, IntBinding, MenuAction,
-    MenuItem, MenuPage, PageRoute, Texts,
+    App, BitsBinding, BoolBinding, ChipBinding, ChoiceBinding, ConfirmDesc, HomeItem, HomePage,
+    InfoPage, InfoRow, IntBinding, MenuAction, MenuItem, MenuPage, PageRoute, Texts,
 };
 
 use super::math::MathPage;
@@ -33,6 +33,12 @@ kk_ui::event_ids! {
     EVENT_ADVANCED_ACTION,
     /// 事件：弹出 Toast。
     EVENT_SHOW_TOAST,
+    /// 事件：分段档位改变。
+    EVENT_LEVEL_CHANGED,
+    /// 事件：位掩码改变。
+    EVENT_CHANNELS_CHANGED,
+    /// 事件：枚举选择改变。
+    EVENT_REFRESH_CHANGED,
 }
 
 // 图标是 32×32 XBM，每个 128 字节。
@@ -45,6 +51,12 @@ kk_ui::icons! {
 }
 
 kk_ui::shared! {
+    /// 分段单选：0 低、1 中、2 高。
+    LEVEL: u8 = 1,
+    /// 位掩码：4 个通道，初始开 0 号和 2 号。
+    CHANNELS: u32 = 0b0101,
+    /// 枚举选择：刷新率下标。
+    REFRESH_INDEX: u16 = 1,
     BRIGHTNESS: i32 = 80,
     ANIMATION_INTERVAL: i32 = 20,
     DEMO_SWITCH: bool = true,
@@ -115,6 +127,12 @@ pub(super) static ROUTE_COMPONENTS: PageRoute = PageRoute::Menu(&MenuPage {
     items: &COMPONENT_ITEMS,
     states: Some(&COMPONENT_STATES),
 });
+/// 页面：取值控件演示。
+pub(super) static ROUTE_CONTROLS: PageRoute = PageRoute::Menu(&MenuPage {
+    title: "取值控件",
+    items: &CONTROL_ITEMS,
+    states: None,
+});
 /// 页面：数学。
 pub(super) static ROUTE_MATH: PageRoute = PageRoute::Custom(&MATH);
 
@@ -158,6 +176,29 @@ pub(super) static BOOL_DISABLE_ITEM: BoolBinding = BoolBinding {
     changed_event: EVENT_DEMO_LOCK_CHANGED,
 };
 
+/// 分段单选绑定：音频档位。
+pub(super) static CHIP_LEVEL: ChipBinding = ChipBinding {
+    levels: &["低", "中", "高"],
+    value: &LEVEL,
+    changed_event: EVENT_LEVEL_CHANGED,
+};
+
+/// 位掩码绑定：四个通道。
+pub(super) static BITS_CHANNELS: BitsBinding = BitsBinding {
+    title: "通道",
+    labels: &["通道一", "通道二", "通道三", "通道四"],
+    value: &CHANNELS,
+    changed_event: EVENT_CHANNELS_CHANGED,
+};
+
+/// 枚举选择绑定：刷新率。
+pub(super) static CHOICE_REFRESH: ChoiceBinding = ChoiceBinding {
+    title: "刷新率",
+    labels: &["30Hz", "60Hz", "120Hz"],
+    value: &REFRESH_INDEX,
+    changed_event: EVENT_REFRESH_CHANGED,
+};
+
 /// 确认框：恢复默认设置。
 pub(super) static CONFIRM_RESET: ConfirmDesc = ConfirmDesc {
     text: "恢复默认设置？\n包含屏幕亮度",
@@ -193,7 +234,7 @@ pub(super) static HOME_ITEMS: [HomeItem; 5] = [
     },
 ];
 
-pub(super) static SETTINGS_ITEMS: [MenuItem; 6] = [
+pub(super) static SETTINGS_ITEMS: [MenuItem; 7] = [
     MenuItem {
         label: "屏幕亮度",
         action: MenuAction::Int(&INT_BRIGHTNESS),
@@ -201,6 +242,10 @@ pub(super) static SETTINGS_ITEMS: [MenuItem; 6] = [
     MenuItem {
         label: "开关",
         action: MenuAction::Bool(&BOOL_SWITCH),
+    },
+    MenuItem {
+        label: "取值控件",
+        action: MenuAction::Page(&ROUTE_CONTROLS),
     },
     MenuItem {
         label: "组件演示",
@@ -235,6 +280,26 @@ pub(super) static COMPONENT_ITEMS: [MenuItem; 4] = [
     },
     MenuItem {
         label: "操作示例",
+        action: MenuAction::Event(EVENT_ADVANCED_ACTION),
+    },
+];
+
+/// 取值控件演示页的条目：三种取值控件加一条放不下的长标签。
+pub(super) static CONTROL_ITEMS: [MenuItem; 4] = [
+    MenuItem {
+        label: "音频档位",
+        action: MenuAction::Chip(&CHIP_LEVEL),
+    },
+    MenuItem {
+        label: "通道",
+        action: MenuAction::Bits(&BITS_CHANNELS),
+    },
+    MenuItem {
+        label: "刷新率",
+        action: MenuAction::Choice(&CHOICE_REFRESH),
+    },
+    MenuItem {
+        label: "长标签会自己滚动起来！长标签会自己滚动起来！",
         action: MenuAction::Event(EVENT_ADVANCED_ACTION),
     },
 ];
@@ -313,13 +378,14 @@ pub(super) static CONFIRM_DESCS: [&ConfirmDesc; 1] = [&CONFIRM_RESET];
 pub(super) static WAVE: Wave = Wave::new();
 pub(super) static MATH: MathPage = MathPage::new();
 
-pub(super) static ROUTES: [&PageRoute; 7] = [
+pub(super) static ROUTES: [&PageRoute; 8] = [
     &ROUTE_HOME,
     &ROUTE_SETTINGS,
     &ROUTE_MONITOR,
     &ROUTE_WAVE,
     &ROUTE_ABOUT,
     &ROUTE_COMPONENTS,
+    &ROUTE_CONTROLS,
     &ROUTE_MATH,
 ];
 

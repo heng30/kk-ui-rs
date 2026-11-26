@@ -13,6 +13,7 @@ mod input;
 mod nav;
 mod runtime;
 mod scene;
+mod spring;
 mod state;
 mod status;
 mod timing;
@@ -20,7 +21,7 @@ mod validate;
 
 use crate::gfx::Frame;
 use crate::model::{
-    App, BoolBinding, ConfirmDesc, EventId, Input, IntBinding, ItemState, PageRoute,
+    App, BitsBinding, BoolBinding, ConfirmDesc, EventId, Input, IntBinding, ItemState, PageRoute,
 };
 use crate::widgets::{dialog, pages};
 
@@ -29,7 +30,10 @@ pub use custom::CustomPageHandler;
 pub(crate) use deferred::{Deferred, DeferredType};
 pub(crate) use events::EVENT_QUEUE_LENGTH;
 pub use runtime::Runtime;
-pub(crate) use state::{HomeAnimation, ListAnimation, PageState};
+pub(crate) use spring::{Spring, SpringPreset};
+pub(crate) use state::{
+    BitsAnimation, ChipAnimation, HomeAnimation, ListAnimation, MarqueeState, PageState,
+};
 pub use status::{ErrorInfo, Status};
 pub(crate) use timing::*;
 
@@ -62,6 +66,8 @@ impl<'a> KkUi<'a> {
         if !self.rt.keys_initialized {
             self.rt.next_frame = now;
         }
+        // 弹簧按真实间隔积分，但一帧最多算 100 ms，掉帧时不能一步飞出屏幕。
+        self.rt.dt_ms = now.wrapping_sub(self.rt.last_update).min(100) as i32;
         self.rt.last_update = now;
         self.rt.animate_navigation(now);
         pages::home_animate(&mut self.rt, now);
@@ -129,6 +135,11 @@ impl<'a> KkUi<'a> {
     /// 读取整数编辑器草稿。
     pub fn get_int_editor_draft(&self, binding: &'static IntBinding) -> Option<i32> {
         self.rt.get_int_editor_draft(binding)
+    }
+
+    /// 读取位掩码弹窗草稿。
+    pub fn get_bits_editor_draft(&self, binding: &'static BitsBinding) -> Option<u32> {
+        self.rt.get_bits_editor_draft(binding)
     }
 
     /// 显示工作是否已经静止。

@@ -3,7 +3,9 @@
 //! 公开入口在自绘页回调期间不能直接开弹窗，只能登记请求，等回调退出后统一执行。
 
 use super::{Runtime, Status};
-use crate::model::{BoolBinding, ConfirmDesc, EVENT_NONE, EventId, IntBinding, PageType};
+use crate::model::{
+    BitsBinding, BoolBinding, ChoiceBinding, ConfirmDesc, EVENT_NONE, EventId, IntBinding, PageType,
+};
 use crate::widgets::dialog;
 use crate::widgets::dialog::Row;
 
@@ -20,6 +22,10 @@ pub(crate) enum DeferredType {
     Int,
     /// 打开开关编辑器。
     Bool,
+    /// 打开枚举选择弹窗。
+    Choice,
+    /// 打开位掩码弹窗。
+    Bits,
     /// 打开确认框。
     Confirm,
     /// 打开消息框。
@@ -106,6 +112,48 @@ impl<'a> Runtime<'a> {
         }
         let now = self.last_update;
         dialog::open_bool(self, binding, now)
+    }
+
+    /// 打开枚举选择弹窗。
+    pub fn open_choice_editor(&mut self, binding: &'static ChoiceBinding) -> Status {
+        if !self.initialized {
+            return Status::NotInitialized;
+        }
+        if dialog::dialog_active(self) {
+            return Status::Busy;
+        }
+        if self.in_callback {
+            return self.defer(
+                DeferredType::Choice,
+                Some(Row::Choice(binding)),
+                "",
+                EVENT_NONE,
+                0,
+            );
+        }
+        let now = self.last_update;
+        dialog::open_choice(self, binding, now)
+    }
+
+    /// 打开位掩码弹窗。
+    pub fn open_bits_editor(&mut self, binding: &'static BitsBinding) -> Status {
+        if !self.initialized {
+            return Status::NotInitialized;
+        }
+        if dialog::dialog_active(self) {
+            return Status::Busy;
+        }
+        if self.in_callback {
+            return self.defer(
+                DeferredType::Bits,
+                Some(Row::Bits(binding)),
+                "",
+                EVENT_NONE,
+                0,
+            );
+        }
+        let now = self.last_update;
+        dialog::open_bits(self, binding, now)
     }
 
     /// 打开确认框。
@@ -250,6 +298,16 @@ impl<'a> Runtime<'a> {
             DeferredType::Confirm => {
                 if let Some(Row::Confirm(desc)) = request.row {
                     dialog::open_confirm(self, desc, now);
+                }
+            }
+            DeferredType::Choice => {
+                if let Some(Row::Choice(binding)) = request.row {
+                    dialog::open_choice(self, binding, now);
+                }
+            }
+            DeferredType::Bits => {
+                if let Some(Row::Bits(binding)) = request.row {
+                    dialog::open_bits(self, binding, now);
                 }
             }
             DeferredType::Message => {

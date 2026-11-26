@@ -55,6 +55,9 @@ fn reset_parameters() {
     DEMO_SWITCH.set(true);
     SHOW_ITEM.set(true);
     DISABLE_ITEM.set(false);
+    LEVEL.set(1);
+    CHANNELS.set(0b0101);
+    REFRESH_INDEX.set(1);
     let mut buffer = [0u8; 20];
     BRIGHTNESS_TEXT.set(format_u32(BRIGHTNESS.get() as u32, "%", &mut buffer));
     update_switch_text();
@@ -175,6 +178,9 @@ pub fn process_events(ui: &mut KkUi<'_>) {
                 toast(ui, "设置已更新", 0);
             }
             EVENT_ADVANCED_ACTION => toast(ui, "操作已触发", 0),
+            EVENT_LEVEL_CHANGED | EVENT_CHANNELS_CHANGED | EVENT_REFRESH_CHANGED => {
+                toast(ui, "组件已更新", 0)
+            }
             _ => {}
         }
     }
