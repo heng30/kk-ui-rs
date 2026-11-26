@@ -10,6 +10,7 @@ mod choice_editor;
 mod confirm;
 mod int_editor;
 mod line_input;
+mod loading;
 mod message;
 mod state;
 mod toast;
@@ -28,17 +29,21 @@ pub(crate) use choice_editor::open as open_choice;
 pub(crate) use confirm::open as open_confirm;
 pub(crate) use int_editor::open as open_int;
 pub(crate) use line_input::open as open_line_input;
+pub(crate) use loading::{is_open as loading_open, open as open_loading};
 pub(crate) use message::open as open_message;
 pub(crate) use state::{DialogFocus, Overlay, OverlayType, Row, Toast};
 pub(crate) use toast::draw as draw_toast;
 pub(crate) use toast::open as toast_open;
 
-/// 弹窗最终宽度：文本编辑器要整屏，其余沿用 128 px 画布上的 122。
+/// 弹窗最终宽度：文本编辑器要整屏，加载弹窗按文案长短留出余量，其余沿用 128 px 画布上的 122。
 fn dialog_width(rt: &Runtime) -> i16 {
-    if rt.overlay.kind == OverlayType::LineInput {
-        rt.frame.width() - 2
-    } else {
-        122
+    match rt.overlay.kind {
+        OverlayType::LineInput => rt.frame.width() - 2,
+        OverlayType::Loading => {
+            let text = rt.frame.text_width(rt.overlay.text) as i16 + 16;
+            text.clamp(56, rt.frame.width() - 2)
+        }
+        _ => 122,
     }
 }
 
@@ -60,11 +65,13 @@ fn bits_visible(rt: &Runtime) -> i16 {
     }
 }
 
-/// 弹窗外框的最终高度：位列表按可见行数长高，文本编辑器占满整屏，其它弹窗沿用 64 行基准的 61。
+/// 弹窗外框的最终高度：位列表按可见行数长高，文本编辑器占满整屏，加载弹窗小一号，
+/// 其它弹窗沿用 64 行基准的 61。
 fn frame_height(rt: &Runtime) -> i16 {
     match rt.overlay.kind {
         OverlayType::Bits => 44 + bits_visible(rt) * 16,
         OverlayType::LineInput => rt.frame.height() - 2,
+        OverlayType::Loading => 52,
         _ => 61,
     }
 }
@@ -223,7 +230,7 @@ fn begin(
     rt.overlay.focus_mode = focus;
     rt.overlay.editing = !matches!(
         kind,
-        OverlayType::Confirm | OverlayType::Message | OverlayType::None
+        OverlayType::Confirm | OverlayType::Message | OverlayType::Loading | OverlayType::None
     );
     rt.overlay.cursor = 0;
     rt.overlay.top = 0;
@@ -318,6 +325,8 @@ pub(crate) fn input(rt: &mut Runtime, event: InputEvent, now: u32) {
         OverlayType::Message => message::input(rt, event, now),
         OverlayType::Confirm => confirm::input(rt, event, now),
         OverlayType::LineInput => line_input::input(rt, event, now),
+        // 加载弹窗不响应任何按键，只能由应用关闭。
+        OverlayType::Loading => {}
         OverlayType::Int | OverlayType::Bool | OverlayType::Choice | OverlayType::Bits => {
             editor_input(rt, event, now)
         }
@@ -424,7 +433,8 @@ pub(crate) fn animate(rt: &mut Runtime, now: u32) {
                 rt.overlay.value_moving = false;
             }
         }
-        if redraw {
+        if redraw || rt.overlay.kind == OverlayType::Loading {
+            // 指示器位置按时间算，没有补间状态可以触发重画。
             rt.dirty = true;
         }
     }
@@ -475,11 +485,15 @@ pub(crate) fn draw(rt: &mut Runtime<'_>) {
         OverlayType::Bits => bits_editor::draw(rt, &layout),
         OverlayType::Message => message::draw(rt, &layout),
         OverlayType::LineInput => line_input::draw(rt, &layout),
+        OverlayType::Loading => loading::draw(rt, &layout),
         OverlayType::None => {}
     }
 
-    // 文本编辑器用键上的光标框，不再画弹窗的焦点框。
-    if rt.overlay.kind != OverlayType::LineInput {
+    // 文本编辑器用键上的光标框，加载弹窗没有可聚焦的东西，都不画弹窗的焦点框。
+    if !matches!(
+        rt.overlay.kind,
+        OverlayType::LineInput | OverlayType::Loading
+    ) {
         let (focus_x, focus_y, focus_w, focus_h) = current_focus(rt, rt.last_update);
         rt.frame.set_draw_mode(DrawMode::Xor);
         rt.frame.draw_rbox(

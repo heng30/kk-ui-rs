@@ -27,6 +27,8 @@ pub(crate) enum OverlayType {
     Confirm,
     /// 消息框。
     Message,
+    /// 加载弹窗。
+    Loading,
 }
 
 /// 弹窗焦点。

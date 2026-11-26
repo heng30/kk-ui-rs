@@ -45,6 +45,9 @@ pub(super) fn format_u32<'a>(value: u32, unit: &str, buffer: &'a mut [u8; 20]) -
     core::str::from_utf8(&buffer[..out]).unwrap_or("")
 }
 
+/// 本次演示的加载弹窗持续时长（毫秒）。
+const LOADING_MS: u32 = 1200;
+
 fn update_switch_text() {
     SWITCH_TEXT.set(if DEMO_SWITCH.get() { "开" } else { "关" });
 }
@@ -118,6 +121,7 @@ pub fn reset(ui: &mut KkUi<'_>, now: u32) {
     APP_NOW.set(now);
     UPDATE_EPOCH.set(0);
     PENDING_TOAST.set(None);
+    LOADING_UNTIL.set(0);
     apply_component_state(ui);
     ui.invalidate();
 }
@@ -125,6 +129,11 @@ pub fn reset(ui: &mut KkUi<'_>, now: u32) {
 /// 每秒刷新一次运行时间。
 pub fn update(ui: &mut KkUi<'_>, now: u32) {
     APP_NOW.set(now);
+    let until = LOADING_UNTIL.get();
+    if until != 0 && (now.wrapping_sub(until) as i32) >= 0 {
+        LOADING_UNTIL.set(0);
+        ui.hide_loading();
+    }
     UPDATE_EPOCH.set(UPDATE_EPOCH.get().wrapping_add(1));
     if now.wrapping_sub(INFO_UPDATED_AT.get()) >= 1000 {
         INFO_UPDATED_AT.set(now);
@@ -152,6 +161,11 @@ pub fn process_events(ui: &mut KkUi<'_>) {
                 ui.show_message("确定关闭", EVENT_MESSAGE_ACKNOWLEDGED);
             }
             EVENT_SHOW_TOAST => toast(ui, "这是 Toast 提示", 0),
+            EVENT_SHOW_LOADING => {
+                if ui.show_loading("正在加载") == Status::Ok {
+                    LOADING_UNTIL.set(APP_NOW.get().wrapping_add(LOADING_MS));
+                }
+            }
             EVENT_SWITCH_CHANGED => {
                 update_switch_text();
                 ui.invalidate();

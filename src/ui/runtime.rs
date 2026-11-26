@@ -219,7 +219,7 @@ impl<'a> Runtime<'a> {
         self.current.selected
     }
 
-    /// 是否有覆盖层（编辑器、确认框、消息框）正占用输入。
+    /// 是否有覆盖层（编辑器、确认框、消息框、加载弹窗）正占用输入。
     pub fn dialog_open(&self) -> bool {
         self.overlay.kind != OverlayType::None
     }

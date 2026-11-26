@@ -202,3 +202,36 @@ fn bool_editor_commits_and_toggles() {
     assert!(BOOL_VALUE.get());
     assert_eq!(panel.ui.poll_event(), Some(EVENT_BOOL));
 }
+
+#[test]
+fn loading_dialog_ignores_keys_and_closes_by_api() {
+    let mut panel = Panel::new();
+    assert_eq!(panel.ui.hide_loading(), kk_ui::Status::NotAllowed);
+    assert_eq!(panel.ui.show_loading("Loading"), kk_ui::Status::Ok);
+    panel.step(0);
+    panel.press(KEY_OK);
+    panel.press(KEY_DOWN);
+    assert!(panel.ui.dialog_open(), "loading must swallow keys");
+    let before = panel.ui.frame().buffer().to_vec();
+    for _ in 0..30 {
+        panel.step(0);
+    }
+    assert_ne!(
+        before,
+        panel.ui.frame().buffer(),
+        "spinner must advance on its own"
+    );
+    assert_eq!(panel.ui.hide_loading(), kk_ui::Status::Ok);
+    for _ in 0..70 {
+        panel.step(0);
+    }
+    assert!(!panel.ui.dialog_open(), "loading must finish closing");
+}
+
+#[test]
+fn loading_dialog_rejects_a_second_overlay() {
+    let mut panel = Panel::new();
+    assert_eq!(panel.ui.show_loading("Loading"), kk_ui::Status::Ok);
+    assert_eq!(panel.ui.show_loading("Again"), kk_ui::Status::Busy);
+    assert_eq!(panel.ui.show_message("Hi", EVENT_INT), kk_ui::Status::Busy);
+}

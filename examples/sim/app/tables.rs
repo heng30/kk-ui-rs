@@ -34,6 +34,8 @@ kk_ui::event_ids! {
     EVENT_ADVANCED_ACTION,
     /// 事件：弹出 Toast。
     EVENT_SHOW_TOAST,
+    /// 事件：弹出加载弹窗。
+    EVENT_SHOW_LOADING,
     /// 事件：分段档位改变。
     EVENT_LEVEL_CHANGED,
     /// 事件：位掩码改变。
@@ -93,13 +95,15 @@ kk_ui::shared! {
     UPDATE_EPOCH: u32 = 0,
     /// 待补发的 Toast：覆盖层占用时先记下，下一帧再试。
     PENDING_TOAST: Option<(&'static str, u32)> = None,
+    /// 加载弹窗的自动关闭时刻；0 表示没有等待关闭的加载弹窗。
+    LOADING_UNTIL: u32 = 0,
     /// 亮度控制只上报一次「不支持」。
     BRIGHTNESS_REPORTED: bool = false,
 }
 
 kk_ui::menu_states! {
     /// 设置页条目状态（压缩成 2 bit 一项）。
-    SETTINGS_STATES = [0, 0],
+    SETTINGS_STATES = [0, 0, 0],
     /// 组件演示页条目状态。
     COMPONENT_STATES = [0, 0],
 }
@@ -247,7 +251,7 @@ pub(super) static HOME_ITEMS: [HomeItem; 5] = [
     },
 ];
 
-pub(super) static SETTINGS_ITEMS: [MenuItem; 8] = [
+pub(super) static SETTINGS_ITEMS: [MenuItem; 9] = [
     MenuItem {
         label: "屏幕亮度",
         action: MenuAction::Int(&INT_BRIGHTNESS),
@@ -279,6 +283,10 @@ pub(super) static SETTINGS_ITEMS: [MenuItem; 8] = [
     MenuItem {
         label: "Toast",
         action: MenuAction::Event(EVENT_SHOW_TOAST),
+    },
+    MenuItem {
+        label: "加载弹窗",
+        action: MenuAction::Event(EVENT_SHOW_LOADING),
     },
 ];
 

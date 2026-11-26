@@ -33,6 +33,10 @@ pub(crate) enum DeferredType {
     Confirm,
     /// 打开消息框。
     Message,
+    /// 打开加载弹窗。
+    Loading,
+    /// 关闭加载弹窗。
+    HideLoading,
     /// 显示 Toast。
     Toast,
 }
@@ -231,6 +235,37 @@ impl<'a> Runtime<'a> {
         dialog::toast_open(self, text, duration_ms, now)
     }
 
+    /// 打开加载弹窗；已经有覆盖层时返回 `Busy`。
+    pub fn show_loading(&mut self, text: &'static str) -> Status {
+        if !self.initialized {
+            return Status::NotInitialized;
+        }
+        if dialog::dialog_active(self) {
+            return Status::Busy;
+        }
+        if self.in_callback {
+            return self.defer(DeferredType::Loading, None, text, EVENT_NONE, 0);
+        }
+        let now = self.last_update;
+        dialog::open_loading(self, text, now)
+    }
+
+    /// 关闭加载弹窗；没有加载弹窗时返回 `NotAllowed`。
+    pub fn hide_loading(&mut self) -> Status {
+        if !self.initialized {
+            return Status::NotInitialized;
+        }
+        if !dialog::loading_open(self) {
+            return Status::NotAllowed;
+        }
+        if self.in_callback {
+            return self.defer(DeferredType::HideLoading, None, "", EVENT_NONE, 0);
+        }
+        let now = self.last_update;
+        dialog::close(self, now);
+        Status::Ok
+    }
+
     /// 自绘页请求关闭自己。
     pub fn custom_request_close(&mut self) -> Status {
         if !self.initialized {
@@ -341,6 +376,14 @@ impl<'a> Runtime<'a> {
             }
             DeferredType::Message => {
                 dialog::open_message(self, request.text, request.event, now);
+            }
+            DeferredType::Loading => {
+                dialog::open_loading(self, request.text, now);
+            }
+            DeferredType::HideLoading => {
+                if dialog::loading_open(self) {
+                    dialog::close(self, now);
+                }
             }
             DeferredType::Toast => {
                 dialog::toast_open(self, request.text, request.duration, now);

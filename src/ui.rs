@@ -158,7 +158,7 @@ impl<'a> KkUi<'a> {
         self.rt.selected_index()
     }
 
-    /// 是否有覆盖层（编辑器、确认框、消息框）正占用输入。
+    /// 是否有覆盖层（编辑器、确认框、消息框、加载弹窗）正占用输入。
     pub fn dialog_open(&self) -> bool {
         self.rt.dialog_open()
     }
@@ -196,6 +196,16 @@ impl<'a> KkUi<'a> {
     /// 显示 Toast。
     pub fn show_toast(&mut self, text: &'static str, duration_ms: u32) -> Status {
         self.rt.show_toast(text, duration_ms)
+    }
+
+    /// 打开加载弹窗。
+    pub fn show_loading(&mut self, text: &'static str) -> Status {
+        self.rt.show_loading(text)
+    }
+
+    /// 关闭加载弹窗。
+    pub fn hide_loading(&mut self) -> Status {
+        self.rt.hide_loading()
     }
 
     /// 跳到指定页面。
