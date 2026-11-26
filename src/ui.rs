@@ -23,7 +23,7 @@ use crate::model::{App, EventId, Input, ItemState, PageId};
 use crate::widgets::{dialog, pages};
 
 pub(crate) use anim::{ease_q12, lerp_q12, round_q8};
-pub use custom::CustomPage;
+pub use custom::CustomPageHandler;
 pub(crate) use deferred::{Deferred, DeferredType};
 pub(crate) use events::EVENT_QUEUE_LENGTH;
 pub use runtime::Runtime;
@@ -31,26 +31,17 @@ pub(crate) use state::{HomeAnimation, ListAnimation, PageState};
 pub use status::{ErrorInfo, Status};
 pub(crate) use timing::*;
 
-/// UI 本体：运行时 + 自绘页适配器。
-pub struct KkUi<'a, C: CustomPage> {
+/// UI 本体：运行时 + 应用描述表。自绘页实现挂在 [`App::custom_pages`] 上。
+pub struct KkUi<'a> {
     /// 运行时状态。
     pub(crate) rt: Runtime<'a>,
-    /// 应用提供的自绘页实现。
-    pub(crate) custom: C,
 }
 
-impl<'a, C: CustomPage> KkUi<'a, C> {
-    /// 绑定应用描述表、自绘页实现与一块 `width * ceil(height / 8)` 字节的帧缓冲。
-    pub fn new(
-        app: &'static App,
-        custom: C,
-        buffer: &'a mut [u8],
-        width: i16,
-        height: i16,
-    ) -> Self {
+impl<'a> KkUi<'a> {
+    /// 绑定应用描述表与一块 `width * ceil(height / 8)` 字节的帧缓冲。
+    pub fn new(app: &'static App, buffer: &'a mut [u8], width: i16, height: i16) -> Self {
         Self {
             rt: Runtime::new(app, buffer, width, height),
-            custom,
         }
     }
 
@@ -181,5 +172,15 @@ impl<'a, C: CustomPage> KkUi<'a, C> {
     /// 显示 Toast。
     pub fn show_toast(&mut self, text: &'static str, duration_ms: u32) -> Status {
         self.rt.show_toast(text, duration_ms)
+    }
+
+    /// 跳到指定页面。
+    pub fn navigate_to(&mut self, page: PageId, now: u32) -> Status {
+        self.rt.navigate_to(page, now)
+    }
+
+    /// 返回上一页。
+    pub fn navigate_back(&mut self, now: u32) -> Status {
+        self.rt.navigate_back(now)
     }
 }

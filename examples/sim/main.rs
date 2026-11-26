@@ -64,7 +64,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     set_font(&GLYPHS);
     let buffer: &'static mut [u8] =
         Box::leak(vec![0u8; Frame::buffer_len(WIDTH, HEIGHT)].into_boxed_slice());
-    let mut ui = KkUi::new(&app::APP, app::Wave::new(), buffer, WIDTH, HEIGHT);
+    let mut ui = KkUi::new(&app::APP, buffer, WIDTH, HEIGHT);
     ui.init();
     app::reset(&mut ui, 0);
 
@@ -94,7 +94,7 @@ fn main() -> Result<(), Box<dyn Error>> {
 }
 
 /// 无头模式：让 Demo 自己按 `Autoplay` 走 `steps` 拍，然后存一张 PNG。
-fn headless(ui: &mut KkUi<'_, app::Wave>, steps: u32, path: &Path) -> Result<(), Box<dyn Error>> {
+fn headless(ui: &mut KkUi<'_>, steps: u32, path: &Path) -> Result<(), Box<dyn Error>> {
     let mut autoplay = app::Autoplay::new();
     let mut now = 0;
     // 先送一拍空输入，把去抖状态机的初始电平记为松开，首拍按键才不会被吞。

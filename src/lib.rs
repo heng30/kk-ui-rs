@@ -1,7 +1,7 @@
 //! KK_UI 的 Rust 移植：单色菜单 UI 运行时。
 //!
 //! 结构对应上游 C 版：首页图标选择器、可嵌套菜单、只读信息页、应用自绘页
-//! （[`CustomPage`]）、整数/开关编辑器、确认框、消息框与 Toast。
+//! （[`CustomPageHandler`]）、整数/开关编辑器、确认框、消息框与 Toast。
 //! 画布与 KK_OLED 一致是页式 1 bit 帧缓冲，尺寸由调用方给定（[`Frame::new`]），
 //! 由应用负责把它放大送到真实屏幕。
 //!
@@ -29,9 +29,10 @@ pub mod sim;
 pub use font::{FULL_WIDTH, GLYPH_LEN, GLYPH_SIZE, Glyphs, set_font};
 pub use gfx::{DrawMode, Frame};
 pub use model::{
-    App, BoolBinding, ConfirmDesc, EVENT_NONE, EventId, HomeItem, HomePage, InfoPage, InfoRow,
-    Input, InputAction, InputEvent, InputSource, IntBinding, ItemState, KEY_DOWN, KEY_OK, KEY_UP,
-    MenuItem, MenuItemType, MenuPage, PAGE_NONE, PageId, PageRoute, PageType, Shared, Text, Texts,
+    App, BoolBinding, ConfirmDesc, CustomPage, EVENT_NONE, EventId, HomeItem, HomePage, InfoPage,
+    InfoRow, Input, InputAction, InputEvent, InputSource, IntBinding, ItemState, KEY_DOWN, KEY_OK,
+    KEY_UP, MenuItem, MenuItemType, MenuPage, PAGE_NONE, PageId, PageRoute, PageType, Shared, Text,
+    Texts,
 };
-pub use ui::{CustomPage, ErrorInfo, KkUi, Runtime, Status};
+pub use ui::{CustomPageHandler, ErrorInfo, KkUi, Runtime, Status};
 pub use widgets::{draw_focus, draw_progress_bar, draw_switch, utils::format_int};

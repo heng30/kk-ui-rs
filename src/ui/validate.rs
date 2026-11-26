@@ -14,7 +14,7 @@ impl Runtime<'_> {
                 PageType::Home => app.home_pages.len(),
                 PageType::Menu => app.menu_pages.len(),
                 PageType::Info => app.info_pages.len(),
-                PageType::Custom => app.custom_page_count as usize,
+                PageType::Custom => app.custom_pages.len(),
             };
             if route.index as usize >= count {
                 return Err((index as u16 + 1, route.index));

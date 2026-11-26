@@ -35,7 +35,7 @@ fn repeat_interval(held: u32) -> u32 {
     }
 }
 
-impl<C: super::CustomPage> KkUi<'_, C> {
+impl KkUi<'_> {
     /// 消抖、识别长按重复与编码器，并发出一条归一化输入事件。
     #[allow(clippy::needless_range_loop)]
     pub(super) fn process_input(&mut self, now: u32, input: Input) {
@@ -157,11 +157,12 @@ impl<C: super::CustomPage> KkUi<'_, C> {
             PageType::Menu => pages::menu_input(&mut self.rt, event, now),
             PageType::Info => pages::info_input(&mut self.rt, event, now),
             PageType::Custom => {
-                let Self { rt, custom } = self;
-                let page = rt.current.page;
-                rt.in_callback = true;
-                custom.on_input(rt, page, event);
-                rt.in_callback = false;
+                let page = self.rt.current.page;
+                if let Some(desc) = self.custom_page(page) {
+                    self.rt.in_callback = true;
+                    desc.on_input(&mut self.rt, page, event);
+                    self.rt.in_callback = false;
+                }
             }
         }
     }

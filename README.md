@@ -28,7 +28,7 @@ use kk_ui::{App, CustomPage, Input, KkUi, Status};
 const WIDTH: i16 = 128;
 const HEIGHT: i16 = 64;
 let mut buffer = [0u8; Frame::buffer_len(WIDTH, HEIGHT)];
-let mut ui = KkUi::new(&MY_APP, MyCustomPage::new(), &mut buffer, WIDTH, HEIGHT);
+let mut ui = KkUi::new(&MY_APP, &mut buffer, WIDTH, HEIGHT);
 ui.init();
 
 loop {
@@ -41,14 +41,25 @@ loop {
 ```
 
 
-自绘页实现 `CustomPage`：
+自绘页实现 `CustomPageHandler`，再挂到 `App.custom_pages` 上（路由 `index` 指向表项）：
 
 ```rust
-impl CustomPage for MyPage {
-    fn on_enter(&mut self, ui: &mut Runtime, page: PageId) {}
-    fn on_input(&mut self, ui: &mut Runtime, page: PageId, event: InputEvent) {}
-    fn on_tick(&mut self, ui: &mut Runtime, page: PageId, now: u32) -> bool { false }
-    fn on_draw(&mut self, ui: &mut Runtime, page: PageId, x: i16, clip_x: i16, clip_w: u16) {
+use core::cell::Cell;
+
+static MY_PAGE: MyPage = MyPage::new();
+static CUSTOM_PAGES: [CustomPage; 1] = [&MY_PAGE];
+
+static MY_APP: App = App {
+    // ...
+    custom_pages: &CUSTOM_PAGES,
+};
+
+impl CustomPageHandler for MyPage {
+    // 回调只拿 `&self`，可变状态放 `Cell`/`Shared` 里。
+    fn on_enter(&self, ui: &mut Runtime, page: PageId) {}
+    fn on_input(&self, ui: &mut Runtime, page: PageId, event: InputEvent) {}
+    fn on_tick(&self, ui: &mut Runtime, page: PageId, now: u32) -> bool { false }
+    fn on_draw(&self, ui: &mut Runtime, page: PageId, x: i16, clip_x: i16, clip_w: u16) {
         let frame = ui.frame_mut();
         let (width, height) = (frame.width(), frame.height());
         // frame.draw_text / draw_rbox / ...

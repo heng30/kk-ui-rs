@@ -2,7 +2,7 @@
 
 use super::{PAGE_MS, PageState, Runtime, Status};
 use crate::model::{PageId, PageType};
-use crate::widgets::pages;
+use crate::widgets::{dialog, pages};
 
 /// 导航栈深度上限。
 pub(super) const NAV_DEPTH: usize = 8;
@@ -49,17 +49,17 @@ impl<'a> Runtime<'a> {
         let Some(route) = self.route(page) else {
             return Status::InvalidArgument;
         };
-        if self.transition.active {
+        if self.transition.active || dialog::dialog_active(self) {
             return Status::Busy;
+        }
+        if self.current.page == page {
+            return Status::Ok;
         }
         if self.stack_count as usize >= NAV_DEPTH {
             self.record_error(Status::NavigationFull, self.current.page, page);
             self.reject_flash = 2;
             self.dirty = true;
             return Status::NavigationFull;
-        }
-        if self.current_page_type() == PageType::Custom && route.kind == PageType::Custom {
-            return Status::NotAllowed;
         }
         let outgoing = self.current;
         self.stack[self.stack_count as usize] = outgoing;
@@ -77,7 +77,7 @@ impl<'a> Runtime<'a> {
 
     /// 返回上一页。
     pub fn navigate_back(&mut self, now: u32) -> Status {
-        if self.transition.active {
+        if self.transition.active || dialog::dialog_active(self) {
             return Status::Busy;
         }
         if self.stack_count == 0 {

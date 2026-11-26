@@ -3,12 +3,17 @@
 //! 与 C 版一致，全部是编译期常量表，UI 运行时只读；应用的可变状态通过
 //! [`Shared`] 与 [`Text`] 这类共享单元暴露给表项。
 
+use crate::ui::CustomPageHandler;
 use core::cell::Cell;
 
 /// 页面编号，`0` 表示无页面。
 pub type PageId = u16;
 /// 事件编号，`0` 表示无事件。
 pub type EventId = u16;
+/// 一页自绘页：路由 `index` 指向该表项，回调由它接收。
+///
+/// 页面状态靠实现内部的 `Cell`/`Shared` 自行维护，所以要求 `Sync` 才能放进常量表。
+pub type CustomPage = &'static (dyn CustomPageHandler + Sync);
 
 /// 无页面。
 pub const PAGE_NONE: PageId = 0;
@@ -332,8 +337,8 @@ pub struct App {
     pub menu_pages: &'static [MenuPage],
     /// 信息页表。
     pub info_pages: &'static [InfoPage],
-    /// 自绘页数量。
-    pub custom_page_count: u16,
+    /// 自绘页表。
+    pub custom_pages: &'static [CustomPage],
     /// 整数绑定表。
     pub int_bindings: &'static [IntBinding],
     /// 开关绑定表。

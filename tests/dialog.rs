@@ -4,8 +4,8 @@
 //! 于是编辑器按「确定」永远回到编辑态、确认框永远停在取消上。
 
 use kk_ui::{
-    App, BoolBinding, ConfirmDesc, CustomPage, Frame, Glyphs, Input, IntBinding, KEY_DOWN, KEY_OK,
-    KkUi, MenuItem, MenuItemType, MenuPage, PageId, PageRoute, PageType, Shared, Texts, set_font,
+    App, BoolBinding, ConfirmDesc, Frame, Glyphs, Input, IntBinding, KEY_DOWN, KEY_OK, KkUi,
+    MenuItem, MenuItemType, MenuPage, PageId, PageRoute, PageType, Shared, Texts, set_font,
 };
 
 /// 测试用页面：首页 → 菜单。
@@ -29,10 +29,6 @@ static GLYPHS: Glyphs = Glyphs {
 static ICON: [u8; 8] = [0; 8];
 static INT_VALUE: Shared<i32> = Shared::new(10);
 static BOOL_VALUE: Shared<bool> = Shared::new(false);
-
-struct NoPage;
-
-impl CustomPage for NoPage {}
 
 static ROUTES: [PageRoute; 2] = [
     PageRoute {
@@ -100,7 +96,7 @@ static APP: App = App {
     home_pages: &HOME_PAGES,
     menu_pages: &MENU_PAGES,
     info_pages: &[],
-    custom_page_count: 0,
+    custom_pages: &[],
     int_bindings: &INT_BINDINGS,
     bool_bindings: &BOOL_BINDINGS,
     confirm_descs: &CONFIRMS,
@@ -116,7 +112,7 @@ static APP: App = App {
 
 /// 一台只有按键的模拟面板。
 struct Panel {
-    ui: KkUi<'static, NoPage>,
+    ui: KkUi<'static>,
     now: u32,
 }
 
@@ -126,7 +122,7 @@ impl Panel {
         set_font(&GLYPHS);
         let buffer: &'static mut [u8] =
             Box::leak(vec![0u8; Frame::buffer_len(WIDTH, HEIGHT)].into_boxed_slice());
-        let mut ui = KkUi::new(&APP, NoPage, buffer, WIDTH, HEIGHT);
+        let mut ui = KkUi::new(&APP, buffer, WIDTH, HEIGHT);
         assert_eq!(ui.init(), kk_ui::Status::Ok);
         INT_VALUE.set(10);
         BOOL_VALUE.set(false);

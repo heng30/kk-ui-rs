@@ -5,7 +5,7 @@ use crate::gfx::DrawMode;
 use crate::model::PageType;
 use crate::widgets::{dialog, pages};
 
-impl<C: super::CustomPage> KkUi<'_, C> {
+impl KkUi<'_> {
     /// 按页面类型绘制一页；`x_offset` 为视差位移，`clip_x`/`clip_width` 是可见区域。
     fn draw_page(
         &mut self,
@@ -44,10 +44,11 @@ impl<C: super::CustomPage> KkUi<'_, C> {
                 clip_width,
             ),
             PageType::Custom => {
-                let Self { rt, custom } = self;
-                rt.in_callback = true;
-                custom.on_draw(rt, state.page, x_offset, clip_x, clip_width);
-                rt.in_callback = false;
+                if let Some(desc) = self.custom_page(state.page) {
+                    self.rt.in_callback = true;
+                    desc.on_draw(&mut self.rt, state.page, x_offset, clip_x, clip_width);
+                    self.rt.in_callback = false;
+                }
             }
         }
     }

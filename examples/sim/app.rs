@@ -5,10 +5,10 @@
 //! 改了一边记得同步另一边。
 
 use kk_ui::{
-    App, BoolBinding, ConfirmDesc, CustomPage, DrawMode, EventId, Frame, HomeItem, HomePage,
-    InfoPage, InfoRow, InputAction, InputEvent, IntBinding, ItemState, KEY_DOWN, KEY_OK, KkUi,
-    MenuItem, MenuItemType, MenuPage, PageId, PageRoute, PageType, Runtime, Shared, Text, Texts,
-    draw_progress_bar,
+    App, BoolBinding, ConfirmDesc, CustomPage, CustomPageHandler, DrawMode, EventId, Frame,
+    HomeItem, HomePage, InfoPage, InfoRow, InputAction, InputEvent, IntBinding, ItemState,
+    KEY_DOWN, KEY_OK, KkUi, MenuItem, MenuItemType, MenuPage, PageId, PageRoute, PageType, Runtime,
+    Shared, Text, Texts, draw_progress_bar,
 };
 
 /// 页面：首页。
@@ -316,6 +316,9 @@ static BOOL_BINDINGS: [BoolBinding; 3] = [
     },
 ];
 
+static WAVE: Wave = Wave::new();
+static CUSTOM_PAGES: [CustomPage; 1] = [&WAVE];
+
 static CONFIRM_DESCS: [ConfirmDesc; 1] = [ConfirmDesc {
     text: "恢复默认设置？\n包含屏幕亮度",
     confirmed_event: EVENT_RESET_CONFIRMED,
@@ -356,7 +359,7 @@ pub static APP: App = App {
     home_pages: &HOME_PAGES,
     menu_pages: &MENU_PAGES,
     info_pages: &INFO_PAGES,
-    custom_page_count: 1,
+    custom_pages: &CUSTOM_PAGES,
     int_bindings: &INT_BINDINGS,
     bool_bindings: &BOOL_BINDINGS,
     confirm_descs: &CONFIRM_DESCS,
@@ -371,7 +374,8 @@ pub static APP: App = App {
 };
 
 /// 波形页的帧间状态。
-pub struct Wave {
+#[derive(Clone, Copy)]
+struct WaveState {
     /// 波形相位，0–31。
     phase: u16,
     /// 进度百分比，0–100。
@@ -388,9 +392,9 @@ pub struct Wave {
     draw_epoch: u32,
 }
 
-impl Wave {
+impl WaveState {
     /// 初始状态。
-    pub const fn new() -> Self {
+    const fn new() -> Self {
         Self {
             phase: 0,
             progress: 0,
@@ -401,17 +405,29 @@ impl Wave {
             draw_epoch: u32::MAX,
         }
     }
+}
 
-    fn reset(&mut self, now: u32) {
-        self.phase = 0;
-        self.progress = 0;
-        self.manual = false;
-        self.entered_at = now;
-        self.fps_started = now;
-        self.draw_count = 0;
-        self.draw_epoch = u32::MAX;
+/// 波形页的自绘页实现。
+pub struct Wave {
+    /// 帧间状态；回调只拿 `&self`，所以放在共享单元里。
+    state: Shared<WaveState>,
+}
+
+impl Wave {
+    /// 初始状态。
+    pub const fn new() -> Self {
+        Self {
+            state: Shared::new(WaveState::new()),
+        }
+    }
+
+    fn reset(&self, now: u32) {
+        let mut state = WaveState::new();
+        state.entered_at = now;
+        state.fps_started = now;
+        self.state.set(state);
         FPS_TEXT.set("--");
-        update_progress_text(self.progress, self.manual);
+        update_progress_text(0, false);
     }
 }
 
@@ -421,68 +437,74 @@ impl Default for Wave {
     }
 }
 
-impl CustomPage for Wave {
-    fn on_enter(&mut self, _ui: &mut Runtime, _page: PageId) {
-        let now = APP_NOW.get();
-        self.reset(now);
+impl CustomPageHandler for Wave {
+    fn on_enter(&self, _ui: &mut Runtime, _page: PageId) {
+        self.reset(APP_NOW.get());
     }
 
-    fn on_input(&mut self, ui: &mut Runtime, _page: PageId, event: InputEvent) {
+    fn on_input(&self, ui: &mut Runtime, _page: PageId, event: InputEvent) {
+        let mut state = self.state.get();
         match event.action {
             InputAction::Ok => {
                 ui.custom_request_close();
             }
             InputAction::Up => {
-                self.manual = true;
-                self.progress = self.progress.saturating_sub(event.steps);
-                update_progress_text(self.progress, self.manual);
+                state.manual = true;
+                state.progress = state.progress.saturating_sub(event.steps);
+                self.state.set(state);
+                update_progress_text(state.progress, true);
                 ui.invalidate();
             }
             InputAction::Down => {
-                self.manual = true;
-                self.progress = (self.progress + event.steps).min(100);
-                update_progress_text(self.progress, self.manual);
+                state.manual = true;
+                state.progress = (state.progress + event.steps).min(100);
+                self.state.set(state);
+                update_progress_text(state.progress, true);
                 ui.invalidate();
             }
         }
     }
 
-    fn on_tick(&mut self, _ui: &mut Runtime, _page: PageId, now: u32) -> bool {
+    fn on_tick(&self, _ui: &mut Runtime, _page: PageId, now: u32) -> bool {
+        let mut state = self.state.get();
         let interval = ANIMATION_INTERVAL.get().max(1) as u32;
-        let next = (now.wrapping_sub(self.entered_at) / interval % 32) as u16;
-        let mut changed = next != self.phase;
-        let elapsed = now.wrapping_sub(self.fps_started);
-        self.phase = next;
-        if !self.manual {
-            let progress = (now.wrapping_sub(self.entered_at) / 50 % 101) as u16;
-            if progress != self.progress {
-                self.progress = progress;
-                update_progress_text(self.progress, self.manual);
+        let next = (now.wrapping_sub(state.entered_at) / interval % 32) as u16;
+        let mut changed = next != state.phase;
+        state.phase = next;
+        let elapsed = now.wrapping_sub(state.fps_started);
+        if !state.manual {
+            let progress = (now.wrapping_sub(state.entered_at) / 50 % 101) as u16;
+            if progress != state.progress {
+                state.progress = progress;
+                update_progress_text(state.progress, state.manual);
                 changed = true;
             }
         }
         if elapsed >= 1000 {
-            let fps = ((self.draw_count * 1000 + elapsed / 2) / elapsed).min(999);
+            let fps = ((state.draw_count * 1000 + elapsed / 2) / elapsed).min(999);
             let mut buffer = [0u8; 20];
             FPS_TEXT.set(format_u32(fps, "", &mut buffer));
-            self.draw_count = 0;
-            self.fps_started = now;
+            state.draw_count = 0;
+            state.fps_started = now;
             changed = true;
         }
+        self.state.set(state);
         changed
     }
 
     fn on_draw(
-        &mut self,
+        &self,
         ui: &mut Runtime,
         _page: PageId,
         x_offset: i16,
         clip_x: i16,
         clip_width: u16,
     ) {
-        if self.draw_epoch != UPDATE_EPOCH.get() {
-            self.draw_epoch = UPDATE_EPOCH.get();
-            self.draw_count += 1;
+        let mut state = self.state.get();
+        if state.draw_epoch != UPDATE_EPOCH.get() {
+            state.draw_epoch = UPDATE_EPOCH.get();
+            state.draw_count += 1;
+            self.state.set(state);
         }
         let frame: &mut Frame<'_> = ui.frame_mut();
         let (width, height) = (frame.width(), frame.height());
@@ -495,13 +517,14 @@ impl CustomPage for Wave {
         frame.draw_line(width - 11 + x_offset, 5, width - 5 + x_offset, 11);
         frame.draw_line(width - 5 + x_offset, 5, width - 11 + x_offset, 11);
         frame.set_draw_mode(DrawMode::Xor);
+        frame.set_draw_mode(DrawMode::Xor);
         frame.draw_rbox(width - 15 + x_offset, 1, 14, 14, 3);
         frame.set_draw_mode(DrawMode::Set);
         let wave: [i16; 16] = [0, -3, -7, -11, -7, -3, 0, 3, 7, 11, 7, 3, 0, -2, -1, 0];
         let base = height / 2;
         let mut previous_y = base;
         for x in 0..width {
-            let index = (x as usize + self.phase as usize) & 15;
+            let index = (x as usize + state.phase as usize) & 15;
             let y = base + wave[index] * 8 / 11;
             if x != 0 {
                 frame.draw_line(x - 1 + x_offset, previous_y, x + x_offset, y);
@@ -517,7 +540,7 @@ impl CustomPage for Wave {
             height - 16,
             (width - 20) as u16,
             8,
-            self.progress,
+            state.progress,
             100,
         );
         frame.reset_clip();
@@ -587,7 +610,7 @@ fn reset_parameters() {
 }
 
 /// 按「显示条目 / 禁用条目」刷新组件演示页最后一行的状态。
-fn apply_component_state<C: CustomPage>(ui: &mut KkUi<C>) {
+fn apply_component_state(ui: &mut KkUi<'_>) {
     let state = if !SHOW_ITEM.get() {
         ItemState::Hidden
     } else if DISABLE_ITEM.get() {
@@ -599,7 +622,7 @@ fn apply_component_state<C: CustomPage>(ui: &mut KkUi<C>) {
 }
 
 /// 弹 Toast；覆盖层占用时留到下一帧补发。
-fn toast<C: CustomPage>(ui: &mut KkUi<C>, text: &'static str, duration: u32) {
+fn toast(ui: &mut KkUi<'_>, text: &'static str, duration: u32) {
     if ui.show_toast(text, duration) == kk_ui::Status::Busy {
         PENDING_TOAST.set(Some((text, duration)));
     } else {
@@ -608,13 +631,13 @@ fn toast<C: CustomPage>(ui: &mut KkUi<C>, text: &'static str, duration: u32) {
 }
 
 /// 本屏背光接 GND，没有对比度控制：把「屏幕亮度」标成禁用。
-fn mark_brightness_unsupported<C: CustomPage>(ui: &mut KkUi<C>) {
+fn mark_brightness_unsupported(ui: &mut KkUi<'_>) {
     BRIGHTNESS_STATE.set("不支持");
     ui.set_menu_item_state(PAGE_SETTINGS, 0, ItemState::Disabled);
 }
 
 /// 屏幕亮度依赖 OLED 的对比度命令；只能如实上报不支持。
-fn report_brightness_unsupported<C: CustomPage>(ui: &mut KkUi<C>) {
+fn report_brightness_unsupported(ui: &mut KkUi<'_>) {
     mark_brightness_unsupported(ui);
     toast(ui, "亮度不支持", 0);
 }
@@ -650,7 +673,7 @@ impl Autoplay {
     }
 
     /// 决定这一拍按哪个键。
-    pub fn next_key<C: CustomPage>(&mut self, ui: &KkUi<'_, C>) -> u8 {
+    pub fn next_key(&mut self, ui: &KkUi<'_>) -> u8 {
         // 弹窗一律用「确定」收尾：整数/开关编辑器两下确定提交并关闭，确认框与消息框一下就关。
         if ui.dialog_open() {
             return KEY_OK;
@@ -696,7 +719,7 @@ pub fn menu_item_count(page: PageId) -> u16 {
 }
 
 /// 初始化应用状态；在 [`KkUi::init`] 之前或之后调用都可以。
-pub fn reset<C: CustomPage>(ui: &mut KkUi<C>, now: u32) {
+pub fn reset(ui: &mut KkUi<'_>, now: u32) {
     reset_parameters();
     for slot in &SETTINGS_STATES {
         slot.set(0);
@@ -716,7 +739,7 @@ pub fn reset<C: CustomPage>(ui: &mut KkUi<C>, now: u32) {
 }
 
 /// 每秒刷新一次运行时间。
-pub fn update<C: CustomPage>(ui: &mut KkUi<C>, now: u32) {
+pub fn update(ui: &mut KkUi<'_>, now: u32) {
     APP_NOW.set(now);
     UPDATE_EPOCH.set(UPDATE_EPOCH.get().wrapping_add(1));
     if now.wrapping_sub(INFO_UPDATED_AT.get()) >= 1000 {
@@ -729,7 +752,7 @@ pub fn update<C: CustomPage>(ui: &mut KkUi<C>, now: u32) {
 }
 
 /// 处理应用事件。
-pub fn process_events<C: CustomPage>(ui: &mut KkUi<C>) {
+pub fn process_events(ui: &mut KkUi<'_>) {
     if let Some((text, duration)) = PENDING_TOAST.get() {
         toast(ui, text, duration);
     }

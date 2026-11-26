@@ -60,14 +60,14 @@ pub struct Runtime<'a> {
     pub(crate) dirty: bool,
     /// 是否有一帧新画面待上层提交。
     pub(crate) frame_ready: bool,
-    /// 是否正在执行自绘页回调。
-    pub(crate) in_callback: bool,
     /// [`Runtime::poll_error`] 是否尚未被取走。
     pub(super) error_valid: bool,
     /// 拒绝操作的边框闪烁计数。
     pub(crate) reject_flash: u8,
     /// 页面切换期间需要吞掉的按键位。
     pub(super) blocked_keys: u8,
+    /// 是否正在执行自绘页回调。
+    pub(crate) in_callback: bool,
     /// 待通知的自绘页进入/离开事件，由 [`KkUi`] 在安全时机送进回调。
     pub(super) enter_custom: Option<PageId>,
     pub(super) leave_custom: Option<PageId>,
