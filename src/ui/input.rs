@@ -157,8 +157,10 @@ impl KkUi<'_> {
             PageType::Menu => pages::menu_input(&mut self.rt, event, now),
             PageType::Info => pages::info_input(&mut self.rt, event, now),
             PageType::Custom => {
-                let page = self.rt.current.page;
-                if let Some(desc) = self.custom_page(page) {
+                let Some(page) = self.rt.current.page else {
+                    return;
+                };
+                if let Some(desc) = Self::custom_page(page) {
                     self.rt.in_callback = true;
                     desc.on_input(&mut self.rt, page, event);
                     self.rt.in_callback = false;

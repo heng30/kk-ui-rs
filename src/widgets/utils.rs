@@ -1,8 +1,6 @@
 //! 各组件共用的绘图与格式化工具。
 
 use crate::gfx::Frame;
-use crate::model::PageRoute;
-use crate::ui::{PageState, Runtime};
 
 /// 数字与单位后缀的缓冲容量。
 pub(crate) const BUFFER_LEN: usize = 20;
@@ -44,9 +42,4 @@ pub fn format_int<'a>(value: i32, unit: &str, buffer: &'a mut [u8; BUFFER_LEN]) 
         out += 1;
     }
     core::str::from_utf8(&buffer[..out]).unwrap_or("")
-}
-
-/// 页面编号对应的路由；无页面或越界都返回 `None`。
-pub(crate) fn route_page(rt: &Runtime, state: &PageState) -> Option<PageRoute> {
-    rt.route(state.page)
 }

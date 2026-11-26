@@ -22,7 +22,7 @@
 ## 用法
 
 ```rust
-use kk_ui::{App, CustomPage, Input, KkUi, Status};
+use kk_ui::{App, Input, KkUi, Status};
 
 // 帧缓冲由应用提供，大小是 `Frame::buffer_len(width, height)`。
 const WIDTH: i16 = 128;
@@ -41,17 +41,20 @@ loop {
 ```
 
 
-自绘页实现 `CustomPageHandler`，再挂到 `App.custom_pages` 上（路由 `index` 指向表项）：
+自绘页实现 `CustomPageHandler`，再作为一条路由挂进 `App.routes`——路由表第 `n` 项就是页面
+编号 `n + 1`，页面数据直接挂在路由上，没有第二张需要对齐的表：
 
 ```rust
 use core::cell::Cell;
 
 static MY_PAGE: MyPage = MyPage::new();
-static CUSTOM_PAGES: [CustomPage; 1] = [&MY_PAGE];
+
+static ROUTES: [PageRoute; 1] = [PageRoute::Custom(&MY_PAGE)];
 
 static MY_APP: App = App {
+    root_page: 1,
+    routes: &ROUTES,
     // ...
-    custom_pages: &CUSTOM_PAGES,
 };
 
 impl CustomPageHandler for MyPage {

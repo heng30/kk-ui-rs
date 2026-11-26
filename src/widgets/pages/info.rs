@@ -1,16 +1,18 @@
 //! 只读信息页：名称/取值两列，超出视口时滚动。
 
 use crate::gfx::{DrawMode, Frame};
-use crate::model::{InfoPage, InputAction, InputEvent, PageType};
+use crate::model::{InfoPage, InputAction, InputEvent, PageRoute, PageType};
 use crate::ui::{
     INFO_HEADER_HEIGHT, INFO_SCROLL_MS, PageState, ROW_PITCH, Runtime, ease_q12, lerp_q12, round_q8,
 };
 use crate::widgets::utils;
 
 /// 取当前页面对应的信息页。
-fn info_page(rt: &Runtime, state: &PageState) -> &'static InfoPage {
-    let route = utils::route_page(rt, state).expect("info page route");
-    &rt.app.info_pages[route.index as usize]
+fn info_page(state: &PageState) -> &'static InfoPage {
+    match state.route() {
+        PageRoute::Info(page) => page,
+        _ => panic!("info page route"),
+    }
 }
 
 /// 信息页标题栏高度；无标题时为 0。
@@ -60,7 +62,7 @@ pub(crate) fn info_animate(rt: &mut Runtime, now: u32) {
 
 /// 滚动信息页。
 fn info_move(rt: &mut Runtime, direction: i16, steps: u16, now: u32) {
-    let page = info_page(rt, &rt.current);
+    let page = info_page(&rt.current);
     let current = info_scroll(rt, now);
     let maximum = info_max_scroll_q8(rt, page);
     if steps == 0 || maximum == 0 {
@@ -118,7 +120,7 @@ pub(crate) fn info_draw(
     clip_x: i16,
     clip_width: u16,
 ) {
-    let page = info_page(rt, &state);
+    let page = info_page(&state);
     let header = info_header_height(page);
     let (screen_width, screen_height) = (rt.frame.width(), rt.frame.height());
     let scroll = if is_current && rt.list_anim.active {

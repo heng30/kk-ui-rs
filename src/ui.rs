@@ -19,7 +19,7 @@ mod timing;
 mod validate;
 
 use crate::gfx::Frame;
-use crate::model::{App, EventId, Input, ItemState, PageId};
+use crate::model::{App, EventId, Input, ItemState, PageRoute};
 use crate::widgets::{dialog, pages};
 
 pub(crate) use anim::{ease_q12, lerp_q12, round_q8};
@@ -31,7 +31,7 @@ pub(crate) use state::{HomeAnimation, ListAnimation, PageState};
 pub use status::{ErrorInfo, Status};
 pub(crate) use timing::*;
 
-/// UI 本体：运行时 + 应用描述表。自绘页实现挂在 [`App::custom_pages`] 上。
+/// UI 本体：运行时 + 应用描述表。自绘页实现挂在 [`App::routes`] 上。
 pub struct KkUi<'a> {
     /// 运行时状态。
     pub(crate) rt: Runtime<'a>,
@@ -92,8 +92,8 @@ impl<'a> KkUi<'a> {
         self.rt.frame()
     }
 
-    /// 当前页面编号。
-    pub fn current_page(&self) -> PageId {
+    /// 当前页面句柄；尚未初始化时为 `None`。
+    pub fn current_page(&self) -> Option<&'static PageRoute> {
         self.rt.current_page()
     }
 
@@ -117,11 +117,11 @@ impl<'a> KkUi<'a> {
     /// 设置菜单条目状态。
     pub fn set_menu_item_state(
         &mut self,
-        page_id: PageId,
+        page_route: &'static PageRoute,
         item_index: u16,
         state: ItemState,
     ) -> Status {
-        self.rt.set_menu_item_state(page_id, item_index, state)
+        self.rt.set_menu_item_state(page_route, item_index, state)
     }
 
     /// 读取整数编辑器草稿。
@@ -175,7 +175,7 @@ impl<'a> KkUi<'a> {
     }
 
     /// 跳到指定页面。
-    pub fn navigate_to(&mut self, page: PageId, now: u32) -> Status {
+    pub fn navigate_to(&mut self, page: &'static PageRoute, now: u32) -> Status {
         self.rt.navigate_to(page, now)
     }
 

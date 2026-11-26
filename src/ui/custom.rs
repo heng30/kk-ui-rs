@@ -1,30 +1,30 @@
 //! 自绘页适配器与回调调度。
 
 use super::{KkUi, Runtime};
-use crate::model::{CustomPage, InputEvent, PageId, PageType};
+use crate::model::{CustomPage, InputEvent, PageRoute, PageType};
 
-/// 自绘页适配器：应用实现它，并挂到 [`App::custom_pages`](crate::model::App) 上接管
-/// `PageType::Custom` 页面。
+/// 自绘页适配器：应用实现它，并用 `PageRoute::Custom` 挂进 [`App::routes`](crate::model::App)
+/// 接管自绘页。
 ///
 /// 回调只拿到 `&self`，可变状态请放在 `Cell`/`Shared` 这类内部可变性容器里。
 pub trait CustomPageHandler {
     /// 进入页面。
-    fn on_enter(&self, ui: &mut Runtime<'_>, page: PageId) {
+    fn on_enter(&self, ui: &mut Runtime<'_>, page: &'static PageRoute) {
         let _ = (ui, page);
     }
 
     /// 离开页面；在切换动画结束后调用。
-    fn on_leave(&self, ui: &mut Runtime<'_>, page: PageId) {
+    fn on_leave(&self, ui: &mut Runtime<'_>, page: &'static PageRoute) {
         let _ = (ui, page);
     }
 
     /// 处理输入。
-    fn on_input(&self, ui: &mut Runtime<'_>, page: PageId, event: InputEvent) {
+    fn on_input(&self, ui: &mut Runtime<'_>, page: &'static PageRoute, event: InputEvent) {
         let _ = (ui, page, event);
     }
 
     /// 逐帧推进；返回 `true` 表示需要重画。
-    fn on_tick(&self, ui: &mut Runtime<'_>, page: PageId, now: u32) -> bool {
+    fn on_tick(&self, ui: &mut Runtime<'_>, page: &'static PageRoute, now: u32) -> bool {
         let _ = (ui, page, now);
         false
     }
@@ -33,7 +33,7 @@ pub trait CustomPageHandler {
     fn on_draw(
         &self,
         ui: &mut Runtime<'_>,
-        page: PageId,
+        page: &'static PageRoute,
         x_offset: i16,
         clip_x: i16,
         clip_width: u16,
@@ -43,26 +43,25 @@ pub trait CustomPageHandler {
 }
 
 impl KkUi<'_> {
-    /// 查页面编号对应的自绘页描述。
-    pub(super) fn custom_page(&self, page: PageId) -> Option<CustomPage> {
-        let route = self.rt.route(page)?;
-        if route.kind != PageType::Custom {
-            return None;
+    /// 取自绘页句柄对应的实现。
+    pub(super) fn custom_page(page: &'static PageRoute) -> Option<CustomPage> {
+        match page {
+            PageRoute::Custom(handler) => Some(*handler),
+            _ => None,
         }
-        self.rt.app.custom_pages.get(route.index as usize).copied()
     }
 
     /// 把待发的进入/离开事件送进自绘页回调；先离开旧页，再进入新页。
     pub(super) fn flush_custom(&mut self) {
         while let Some(page) = self.rt.leave_custom.take() {
-            if let Some(desc) = self.custom_page(page) {
+            if let Some(desc) = Self::custom_page(page) {
                 self.rt.in_callback = true;
                 desc.on_leave(&mut self.rt, page);
                 self.rt.in_callback = false;
             }
         }
         while let Some(page) = self.rt.enter_custom.take() {
-            if let Some(desc) = self.custom_page(page) {
+            if let Some(desc) = Self::custom_page(page) {
                 self.rt.in_callback = true;
                 desc.on_enter(&mut self.rt, page);
                 self.rt.in_callback = false;
@@ -75,8 +74,10 @@ impl KkUi<'_> {
         if self.rt.current_page_type() != PageType::Custom || self.rt.transition.active {
             return;
         }
-        let page = self.rt.current.page;
-        let Some(desc) = self.custom_page(page) else {
+        let Some(page) = self.rt.current.page else {
+            return;
+        };
+        let Some(desc) = Self::custom_page(page) else {
             return;
         };
         self.rt.in_callback = true;

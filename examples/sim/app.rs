@@ -5,26 +5,39 @@
 //! 改了一边记得同步另一边。
 
 use kk_ui::{
-    App, BoolBinding, ConfirmDesc, CustomPage, CustomPageHandler, DrawMode, EventId, Frame,
-    HomeItem, HomePage, InfoPage, InfoRow, InputAction, InputEvent, IntBinding, ItemState,
-    KEY_DOWN, KEY_OK, KkUi, MenuItem, MenuItemType, MenuPage, PageId, PageRoute, PageType, Runtime,
-    Shared, Text, Texts, draw_progress_bar,
+    App, BoolBinding, ConfirmDesc, CustomPageHandler, DrawMode, EventId, Frame, HomeItem, HomePage,
+    InfoPage, InfoRow, InputAction, InputEvent, IntBinding, ItemState, KEY_DOWN, KEY_OK, KkUi,
+    MenuAction, MenuItem, MenuPage, PageRoute, Runtime, Shared, Text, Texts, draw_progress_bar,
 };
 
 /// 页面：首页。
-pub const PAGE_HOME: PageId = 1;
+pub static ROUTE_HOME: PageRoute = PageRoute::Home(&HomePage { items: &HOME_ITEMS });
 /// 页面：设置。
-pub const PAGE_SETTINGS: PageId = 2;
+pub static ROUTE_SETTINGS: PageRoute = PageRoute::Menu(&MenuPage {
+    title: "设置",
+    items: &SETTINGS_ITEMS,
+    states: Some(&SETTINGS_STATES),
+});
 /// 页面：数据监测。
-pub const PAGE_MONITOR: PageId = 3;
+pub static ROUTE_MONITOR: PageRoute = PageRoute::Info(&InfoPage {
+    title: "数据监测",
+    rows: &MONITOR_ROWS,
+});
 /// 页面：波形。
-pub const PAGE_WAVE: PageId = 4;
+pub static ROUTE_WAVE: PageRoute = PageRoute::Custom(&WAVE);
 /// 页面：关于设备。
-pub const PAGE_ABOUT: PageId = 5;
+pub static ROUTE_ABOUT: PageRoute = PageRoute::Info(&InfoPage {
+    title: "关于设备",
+    rows: &ABOUT_ROWS,
+});
 /// 页面：组件演示。
-pub const PAGE_COMPONENTS: PageId = 6;
+pub static ROUTE_COMPONENTS: PageRoute = PageRoute::Menu(&MenuPage {
+    title: "组件演示",
+    items: &COMPONENT_ITEMS,
+    states: Some(&COMPONENT_STATES),
+});
 /// 页面：数学。
-pub const PAGE_MATH: PageId = 7;
+pub static ROUTE_MATH: PageRoute = PageRoute::Custom(&MATH);
 
 /// 绑定下标：屏幕亮度。
 const INT_BRIGHTNESS: u16 = 0;
@@ -113,98 +126,73 @@ static HOME_ITEMS: [HomeItem; 5] = [
     HomeItem {
         label: "设置",
         icon: ICON_SETTINGS,
-        target: PAGE_SETTINGS,
+        target: &ROUTE_SETTINGS,
     },
     HomeItem {
         label: "数据监测",
         icon: ICON_MONITOR,
-        target: PAGE_MONITOR,
+        target: &ROUTE_MONITOR,
     },
     HomeItem {
         label: "波形",
         icon: ICON_WAVE,
-        target: PAGE_WAVE,
+        target: &ROUTE_WAVE,
     },
     HomeItem {
         label: "数学",
         icon: ICON_MATH,
-        target: PAGE_MATH,
+        target: &ROUTE_MATH,
     },
     HomeItem {
         label: "关于设备",
         icon: ICON_ABOUT,
-        target: PAGE_ABOUT,
+        target: &ROUTE_ABOUT,
     },
 ];
-
-static HOME_PAGES: [HomePage; 1] = [HomePage { items: &HOME_ITEMS }];
 
 static SETTINGS_ITEMS: [MenuItem; 6] = [
     MenuItem {
         label: "屏幕亮度",
-        kind: MenuItemType::Int,
-        reference: INT_BRIGHTNESS,
+        action: MenuAction::Int(INT_BRIGHTNESS),
     },
     MenuItem {
         label: "开关",
-        kind: MenuItemType::Bool,
-        reference: BOOL_SWITCH,
+        action: MenuAction::Bool(BOOL_SWITCH),
     },
     MenuItem {
         label: "组件演示",
-        kind: MenuItemType::Page,
-        reference: PAGE_COMPONENTS,
+        action: MenuAction::Page(&ROUTE_COMPONENTS),
     },
     MenuItem {
         label: "确认框",
-        kind: MenuItemType::Confirm,
-        reference: CONFIRM_RESET,
+        action: MenuAction::Confirm(CONFIRM_RESET),
     },
     MenuItem {
         label: "消息框",
-        kind: MenuItemType::Action,
-        reference: EVENT_SHOW_MESSAGE,
+        action: MenuAction::Event(EVENT_SHOW_MESSAGE),
     },
     MenuItem {
         label: "Toast",
-        kind: MenuItemType::Action,
-        reference: EVENT_SHOW_TOAST,
+        action: MenuAction::Event(EVENT_SHOW_TOAST),
     },
 ];
 
 static COMPONENT_ITEMS: [MenuItem; 4] = [
     MenuItem {
         label: "动画间隔",
-        kind: MenuItemType::Int,
-        reference: INT_INTERVAL,
+        action: MenuAction::Int(INT_INTERVAL),
     },
     MenuItem {
         label: "显示条目",
-        kind: MenuItemType::Bool,
-        reference: BOOL_SHOW_ITEM,
+        action: MenuAction::Bool(BOOL_SHOW_ITEM),
     },
     MenuItem {
         label: "禁用条目",
-        kind: MenuItemType::Bool,
-        reference: BOOL_DISABLE_ITEM,
+        action: MenuAction::Bool(BOOL_DISABLE_ITEM),
     },
     MenuItem {
         label: "操作示例",
-        kind: MenuItemType::Action,
-        reference: EVENT_ADVANCED_ACTION,
-    },
-];
-
-static MENU_PAGES: [MenuPage; 2] = [
-    MenuPage {
-        title: "设置",
-        items: &SETTINGS_ITEMS,
-        states: Some(&SETTINGS_STATES),
-    },
-    MenuPage {
-        title: "组件演示",
-        items: &COMPONENT_ITEMS,
-        states: Some(&COMPONENT_STATES),
+        action: MenuAction::Event(EVENT_ADVANCED_ACTION),
     },
 ];
 
@@ -274,17 +262,6 @@ static ABOUT_ROWS: [InfoRow; 10] = [
     },
 ];
 
-static INFO_PAGES: [InfoPage; 2] = [
-    InfoPage {
-        title: "数据监测",
-        rows: &MONITOR_ROWS,
-    },
-    InfoPage {
-        title: "关于设备",
-        rows: &ABOUT_ROWS,
-    },
-];
-
 static INT_BINDINGS: [IntBinding; 2] = [
     IntBinding {
         title: "屏幕亮度",
@@ -326,7 +303,6 @@ static BOOL_BINDINGS: [BoolBinding; 3] = [
 
 static WAVE: Wave = Wave::new();
 static MATH: MathPage = MathPage::new();
-static CUSTOM_PAGES: [CustomPage; 2] = [&WAVE, &MATH];
 
 static CONFIRM_DESCS: [ConfirmDesc; 1] = [ConfirmDesc {
     text: "恢复默认设置？\n包含屏幕亮度",
@@ -334,45 +310,19 @@ static CONFIRM_DESCS: [ConfirmDesc; 1] = [ConfirmDesc {
     cancelled_event: EVENT_RESET_CANCELLED,
 }];
 
-static ROUTES: [PageRoute; 7] = [
-    PageRoute {
-        kind: PageType::Home,
-        index: 0,
-    },
-    PageRoute {
-        kind: PageType::Menu,
-        index: 0,
-    },
-    PageRoute {
-        kind: PageType::Info,
-        index: 0,
-    },
-    PageRoute {
-        kind: PageType::Custom,
-        index: 0,
-    },
-    PageRoute {
-        kind: PageType::Info,
-        index: 1,
-    },
-    PageRoute {
-        kind: PageType::Menu,
-        index: 1,
-    },
-    PageRoute {
-        kind: PageType::Custom,
-        index: 1,
-    },
+static ROUTES: [&PageRoute; 7] = [
+    &ROUTE_HOME,
+    &ROUTE_SETTINGS,
+    &ROUTE_MONITOR,
+    &ROUTE_WAVE,
+    &ROUTE_ABOUT,
+    &ROUTE_COMPONENTS,
+    &ROUTE_MATH,
 ];
-
 /// 整个应用描述表。
 pub static APP: App = App {
-    root_page: PAGE_HOME,
+    root_page: &ROUTE_HOME,
     routes: &ROUTES,
-    home_pages: &HOME_PAGES,
-    menu_pages: &MENU_PAGES,
-    info_pages: &INFO_PAGES,
-    custom_pages: &CUSTOM_PAGES,
     int_bindings: &INT_BINDINGS,
     bool_bindings: &BOOL_BINDINGS,
     confirm_descs: &CONFIRM_DESCS,
@@ -451,11 +401,11 @@ impl Default for Wave {
 }
 
 impl CustomPageHandler for Wave {
-    fn on_enter(&self, _ui: &mut Runtime, _page: PageId) {
+    fn on_enter(&self, _ui: &mut Runtime, _page: &'static PageRoute) {
         self.reset(APP_NOW.get());
     }
 
-    fn on_input(&self, ui: &mut Runtime, _page: PageId, event: InputEvent) {
+    fn on_input(&self, ui: &mut Runtime, _page: &'static PageRoute, event: InputEvent) {
         let mut state = self.state.get();
         match event.action {
             InputAction::Ok => {
@@ -478,7 +428,7 @@ impl CustomPageHandler for Wave {
         }
     }
 
-    fn on_tick(&self, _ui: &mut Runtime, _page: PageId, now: u32) -> bool {
+    fn on_tick(&self, _ui: &mut Runtime, _page: &'static PageRoute, now: u32) -> bool {
         let mut state = self.state.get();
         let interval = ANIMATION_INTERVAL.get().max(1) as u32;
         let next = (now.wrapping_sub(state.entered_at) / interval % 32) as u16;
@@ -508,7 +458,7 @@ impl CustomPageHandler for Wave {
     fn on_draw(
         &self,
         ui: &mut Runtime,
-        _page: PageId,
+        _page: &'static PageRoute,
         x_offset: i16,
         clip_x: i16,
         clip_width: u16,
@@ -607,19 +557,19 @@ const SINE: [i16; 32] = [
 ];
 
 impl CustomPageHandler for MathPage {
-    fn on_enter(&self, _ui: &mut Runtime, _page: PageId) {
+    fn on_enter(&self, _ui: &mut Runtime, _page: &'static PageRoute) {
         let mut state = MathState::new();
         state.entered_at = APP_NOW.get();
         self.state.set(state);
     }
 
-    fn on_input(&self, ui: &mut Runtime, _page: PageId, event: InputEvent) {
+    fn on_input(&self, ui: &mut Runtime, _page: &'static PageRoute, event: InputEvent) {
         if event.action == InputAction::Ok {
             ui.custom_request_close();
         }
     }
 
-    fn on_tick(&self, _ui: &mut Runtime, _page: PageId, now: u32) -> bool {
+    fn on_tick(&self, _ui: &mut Runtime, _page: &'static PageRoute, now: u32) -> bool {
         let mut state = self.state.get();
         let shift = (now.wrapping_sub(state.entered_at) / 40 % 32) as u16;
         if shift == state.shift {
@@ -633,7 +583,7 @@ impl CustomPageHandler for MathPage {
     fn on_draw(
         &self,
         ui: &mut Runtime,
-        _page: PageId,
+        _page: &'static PageRoute,
         x_offset: i16,
         clip_x: i16,
         clip_width: u16,
@@ -733,7 +683,7 @@ fn apply_component_state(ui: &mut KkUi<'_>) {
     } else {
         ItemState::Normal
     };
-    ui.set_menu_item_state(PAGE_COMPONENTS, 3, state);
+    ui.set_menu_item_state(&ROUTE_COMPONENTS, 3, state);
 }
 
 /// 弹 Toast；覆盖层占用时留到下一帧补发。
@@ -748,7 +698,7 @@ fn toast(ui: &mut KkUi<'_>, text: &'static str, duration: u32) {
 /// 本屏背光接 GND，没有对比度控制：把「屏幕亮度」标成禁用。
 fn mark_brightness_unsupported(ui: &mut KkUi<'_>) {
     BRIGHTNESS_STATE.set("不支持");
-    ui.set_menu_item_state(PAGE_SETTINGS, 0, ItemState::Disabled);
+    ui.set_menu_item_state(&ROUTE_SETTINGS, 0, ItemState::Disabled);
 }
 
 /// 屏幕亮度依赖 OLED 的对比度命令；只能如实上报不支持。
@@ -793,8 +743,10 @@ impl Autoplay {
         if ui.dialog_open() {
             return KEY_OK;
         }
-        let page = ui.current_page();
-        if page == PAGE_HOME {
+        let Some(page) = ui.current_page() else {
+            return KEY_OK;
+        };
+        if core::ptr::eq(page, &ROUTE_HOME) {
             // 首页：先把选中项走到目标图标，再按「确定」进去；目标按顺序轮换。
             if ui.selected_index() == self.target {
                 self.target = (self.target + 1) % HOME_ITEMS.len() as u16;
@@ -810,7 +762,7 @@ impl Autoplay {
         // 菜单：每一行先按「确定」打开一次，打开过就往下走；走到最后一行（虚拟返回项）
         // 就清空标记并离开，下一轮进来又是逐个打开。
         let selected = ui.selected_index();
-        let slot = page as usize % AUTOPLAY_PAGES;
+        let slot = menu_slot(page);
         if selected < items {
             let bit = 1u32 << (selected & 31);
             if self.opened[slot] & bit == 0 {
@@ -825,11 +777,19 @@ impl Autoplay {
 }
 
 /// 菜单页的条目数（不含虚拟返回项）；非菜单页返回 0。
-pub fn menu_item_count(page: PageId) -> u16 {
+pub fn menu_item_count(page: &'static PageRoute) -> u16 {
     match page {
-        PAGE_SETTINGS => SETTINGS_ITEMS.len() as u16,
-        PAGE_COMPONENTS => COMPONENT_ITEMS.len() as u16,
+        PageRoute::Menu(menu) => menu.items.len() as u16,
         _ => 0,
+    }
+}
+
+/// 菜单页在 autoplay 记忆表里的槽位。
+fn menu_slot(page: &'static PageRoute) -> usize {
+    if core::ptr::eq(page, &ROUTE_COMPONENTS) {
+        1
+    } else {
+        0
     }
 }
 

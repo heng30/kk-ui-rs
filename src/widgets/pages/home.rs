@@ -1,7 +1,7 @@
 //! 首页：环形排列的图标选择器，切换时横向滑入。
 
 use crate::gfx::DrawMode;
-use crate::model::{HomePage, InputAction, InputEvent, PageType};
+use crate::model::{HomePage, InputAction, InputEvent, PageRoute, PageType};
 use crate::ui::{HOME_MS, PageState, Runtime, ease_q12, lerp_q12, round_q8};
 
 /// 首页标签框的宽度上限：画布宽度留 4 px 边距。
@@ -10,9 +10,11 @@ fn home_label_limit(rt: &Runtime) -> i32 {
 }
 
 /// 取当前页面对应的首页入口表。
-fn home_page(rt: &Runtime, state: &PageState) -> &'static HomePage {
-    let route = rt.route(state.page).expect("home page route");
-    &rt.app.home_pages[route.index as usize]
+fn home_page(state: &PageState) -> &'static HomePage {
+    match state.route() {
+        PageRoute::Home(page) => page,
+        _ => panic!("home page route"),
+    }
 }
 
 /// 环形展开后的相对位置。
@@ -52,7 +54,7 @@ fn home_text_spacing(rt: &mut Runtime, page: &'static HomePage) -> i16 {
 
 /// 当前（可能仍在动画中的）横向偏移与标签宽度，Q8。
 fn home_values(rt: &mut Runtime, now: u32) -> (i32, i32) {
-    let page = home_page(rt, &rt.current);
+    let page = home_page(&rt.current);
     if rt.home_anim.active {
         let p = ease_q12(now.wrapping_sub(rt.home_anim.started), HOME_MS);
         (
@@ -77,7 +79,7 @@ pub(crate) fn home_animate(rt: &mut Runtime, now: u32) {
 
 /// 切换选中项。
 fn home_move(rt: &mut Runtime, direction: i16, steps: u16, now: u32) {
-    let page = home_page(rt, &rt.current);
+    let page = home_page(&rt.current);
     let count = page.items.len() as u16;
     if count == 0 || steps == 0 {
         return;
@@ -102,7 +104,7 @@ fn home_move(rt: &mut Runtime, direction: i16, steps: u16, now: u32) {
 
 /// 首页输入。
 pub(crate) fn home_input(rt: &mut Runtime, event: InputEvent, now: u32) {
-    let page = home_page(rt, &rt.current);
+    let page = home_page(&rt.current);
     match event.action {
         InputAction::Ok => {
             let target = page.items[rt.current.selected as usize].target;
@@ -123,7 +125,7 @@ pub(crate) fn home_draw(
     clip_x: i16,
     clip_width: u16,
 ) {
-    let page = home_page(rt, &state);
+    let page = home_page(&state);
     let clip_right = clip_x + clip_width as i16;
     let (screen_width, screen_height) = (rt.frame.width(), rt.frame.height());
     // 首页内容按 64 行高的基准布局，画布更高时整块垂直居中。

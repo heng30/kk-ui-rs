@@ -1,12 +1,9 @@
 //! 自绘页导航：Custom ↔ Custom 互跳、互跳后返回、跳到当前页、转场与弹窗期间的导航。
 
 use kk_ui::{
-    App, CustomPage, CustomPageHandler, Frame, Input, KEY_OK, KkUi, PageId, PageRoute, PageType,
-    Runtime, Shared, Status, Texts,
+    App, CustomPageHandler, Frame, Input, KEY_OK, KkUi, PageRoute, Runtime, Shared, Status, Texts,
 };
 
-const PAGE_A: PageId = 1;
-const PAGE_B: PageId = 2;
 const WIDTH: i16 = 64;
 const HEIGHT: i16 = 32;
 
@@ -26,6 +23,12 @@ fn push(kind: u32) {
     SEQ.set((SEQ.get() << 3) | kind);
 }
 
+/// 当前页面是否就是这条路由。
+fn at(ui: &KkUi<'_>, route: &'static PageRoute) -> bool {
+    ui.current_page()
+        .is_some_and(|current| core::ptr::eq(current, route))
+}
+
 /// 把事件编号按发生顺序拼成期望的序列值。
 fn seq(events: &[u32]) -> u32 {
     events.iter().fold(0, |acc, &kind| (acc << 3) | kind)
@@ -35,45 +38,33 @@ struct PageA;
 struct PageB;
 
 impl CustomPageHandler for PageA {
-    fn on_enter(&self, _ui: &mut Runtime<'_>, _page: PageId) {
+    fn on_enter(&self, _ui: &mut Runtime<'_>, _page: &'static PageRoute) {
         push(1);
     }
 
-    fn on_leave(&self, _ui: &mut Runtime<'_>, _page: PageId) {
+    fn on_leave(&self, _ui: &mut Runtime<'_>, _page: &'static PageRoute) {
         push(2);
     }
 }
 
 impl CustomPageHandler for PageB {
-    fn on_enter(&self, _ui: &mut Runtime<'_>, _page: PageId) {
+    fn on_enter(&self, _ui: &mut Runtime<'_>, _page: &'static PageRoute) {
         push(3);
     }
 
-    fn on_leave(&self, _ui: &mut Runtime<'_>, _page: PageId) {
+    fn on_leave(&self, _ui: &mut Runtime<'_>, _page: &'static PageRoute) {
         push(4);
     }
 }
 
 static HANDLER_A: PageA = PageA;
 static HANDLER_B: PageB = PageB;
-static PAGES: [CustomPage; 2] = [&HANDLER_A, &HANDLER_B];
-static ROUTES: [PageRoute; 2] = [
-    PageRoute {
-        kind: PageType::Custom,
-        index: 0,
-    },
-    PageRoute {
-        kind: PageType::Custom,
-        index: 1,
-    },
-];
+static ROUTE_A: PageRoute = PageRoute::Custom(&HANDLER_A);
+static ROUTE_B: PageRoute = PageRoute::Custom(&HANDLER_B);
+static ROUTES: [&PageRoute; 2] = [&ROUTE_A, &ROUTE_B];
 static APP: App = App {
-    root_page: PAGE_A,
+    root_page: &ROUTE_A,
     routes: &ROUTES,
-    home_pages: &[],
-    menu_pages: &[],
-    info_pages: &[],
-    custom_pages: &PAGES,
     int_bindings: &[],
     bool_bindings: &[],
     confirm_descs: &[],
@@ -127,7 +118,7 @@ impl Rig {
     }
 
     /// 导航并把转场推到结束；`now` 不变时第二次导航才是 `Busy` 的判据。
-    fn navigate_to(&mut self, page: PageId) -> Status {
+    fn navigate_to(&mut self, page: &'static PageRoute) -> Status {
         let status = self.ui.navigate_to(page, self.now);
         for _ in 0..70 {
             self.step(0);
@@ -151,19 +142,19 @@ fn custom_pages_navigate_both_ways() {
     assert_eq!(SEQ.get(), seq(&[1]), "root page enters on init");
 
     // 跳到当前页：不转场、不压栈、不触发回调。
-    assert_eq!(rig.navigate_to(PAGE_A), Status::Ok);
-    assert_eq!(rig.ui.current_page(), PAGE_A);
+    assert_eq!(rig.navigate_to(&ROUTE_A), Status::Ok);
+    assert!(at(&rig.ui, &ROUTE_A));
     assert_eq!(SEQ.get(), seq(&[1]), "same page must not fire callbacks");
     assert_eq!(rig.navigate_back(), Status::NotAllowed, "stack stays empty");
 
     // A → B：先离开旧页再进入新页。
-    assert_eq!(rig.navigate_to(PAGE_B), Status::Ok);
-    assert_eq!(rig.ui.current_page(), PAGE_B);
+    assert_eq!(rig.navigate_to(&ROUTE_B), Status::Ok);
+    assert!(at(&rig.ui, &ROUTE_B));
     assert_eq!(SEQ.get(), seq(&[1, 2, 3]), "leave A then enter B");
 
     // 返回 A：B 离开、A 重新进入。
     assert_eq!(rig.navigate_back(), Status::Ok);
-    assert_eq!(rig.ui.current_page(), PAGE_A);
+    assert!(at(&rig.ui, &ROUTE_A));
     assert_eq!(SEQ.get(), seq(&[1, 2, 3, 4, 1]), "leave B then enter A");
 }
 
@@ -173,22 +164,22 @@ fn navigation_is_rejected_during_transition_and_dialog() {
     let mut rig = Rig::new();
 
     // 转场进行中再导航：Busy，且回调一个都不发。
-    assert_eq!(rig.ui.navigate_to(PAGE_B, rig.now), Status::Ok);
-    assert_eq!(rig.ui.navigate_to(PAGE_A, rig.now), Status::Busy);
+    assert_eq!(rig.ui.navigate_to(&ROUTE_B, rig.now), Status::Ok);
+    assert_eq!(rig.ui.navigate_to(&ROUTE_A, rig.now), Status::Busy);
     assert_eq!(rig.ui.navigate_back(rig.now), Status::Busy);
     assert_eq!(SEQ.get(), seq(&[1]), "rejected navigation stays silent");
     for _ in 0..70 {
         rig.step(0);
     }
-    assert_eq!(rig.ui.current_page(), PAGE_B);
+    assert!(at(&rig.ui, &ROUTE_B));
     assert_eq!(SEQ.get(), seq(&[1, 2, 3]));
 
     // 弹窗打开期间同样不许导航，也不许把按键漏给自绘页。
     assert_eq!(rig.ui.show_message("hi", 0), Status::Ok);
     assert!(rig.ui.dialog_open());
-    assert_eq!(rig.ui.navigate_to(PAGE_A, rig.now), Status::Busy);
+    assert_eq!(rig.ui.navigate_to(&ROUTE_A, rig.now), Status::Busy);
     assert_eq!(rig.ui.navigate_back(rig.now), Status::Busy);
-    assert_eq!(rig.ui.current_page(), PAGE_B);
+    assert!(at(&rig.ui, &ROUTE_B));
     rig.press(KEY_OK);
     assert!(!rig.ui.dialog_open(), "OK closes the message box");
     assert_eq!(
@@ -198,7 +189,7 @@ fn navigation_is_rejected_during_transition_and_dialog() {
     );
 
     // 弹窗关掉后互跳照常。
-    assert_eq!(rig.navigate_to(PAGE_A), Status::Ok);
-    assert_eq!(rig.ui.current_page(), PAGE_A);
+    assert_eq!(rig.navigate_to(&ROUTE_A), Status::Ok);
+    assert!(at(&rig.ui, &ROUTE_A));
     assert_eq!(SEQ.get(), seq(&[1, 2, 3, 4, 1]));
 }

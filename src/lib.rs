@@ -31,8 +31,7 @@ pub use gfx::{DrawMode, Frame};
 pub use model::{
     App, BoolBinding, ConfirmDesc, CustomPage, EVENT_NONE, EventId, HomeItem, HomePage, InfoPage,
     InfoRow, Input, InputAction, InputEvent, InputSource, IntBinding, ItemState, KEY_DOWN, KEY_OK,
-    KEY_UP, MenuItem, MenuItemType, MenuPage, PAGE_NONE, PageId, PageRoute, PageType, Shared, Text,
-    Texts,
+    KEY_UP, MenuAction, MenuItem, MenuPage, PageRoute, PageType, Shared, Text, Texts,
 };
 pub use ui::{CustomPageHandler, ErrorInfo, KkUi, Runtime, Status};
 pub use widgets::{draw_focus, draw_progress_bar, draw_switch, utils::format_int};

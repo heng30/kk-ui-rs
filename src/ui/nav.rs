@@ -1,7 +1,7 @@
 //! 导航栈与页面切换动画。
 
 use super::{PAGE_MS, PageState, Runtime, Status};
-use crate::model::{PageId, PageType};
+use crate::model::{PageRoute, PageType};
 use crate::widgets::{dialog, pages};
 
 /// 导航栈深度上限。
@@ -30,8 +30,7 @@ impl<'a> Runtime<'a> {
             }
         }
         self.blocked_keys |= stable;
-        let leave_custom =
-            self.route(outgoing.page).map(|route| route.kind) == Some(PageType::Custom);
+        let leave_custom = outgoing.page.map(PageRoute::kind) == Some(PageType::Custom);
         self.transition = PageTransition {
             outgoing,
             started: now,
@@ -39,24 +38,25 @@ impl<'a> Runtime<'a> {
             reverse,
         };
         if leave_custom {
-            self.leave_custom = Some(outgoing.page);
+            self.leave_custom = outgoing.page;
         }
         self.dirty = true;
     }
 
     /// 进入页面。
-    pub fn navigate_to(&mut self, page: PageId, now: u32) -> Status {
-        let Some(route) = self.route(page) else {
-            return Status::InvalidArgument;
-        };
+    pub fn navigate_to(&mut self, page: &'static PageRoute, now: u32) -> Status {
         if self.transition.active || dialog::dialog_active(self) {
             return Status::Busy;
         }
-        if self.current.page == page {
+        if self
+            .current
+            .page
+            .is_some_and(|current| core::ptr::eq(current, page))
+        {
             return Status::Ok;
         }
         if self.stack_count as usize >= NAV_DEPTH {
-            self.record_error(Status::NavigationFull, self.current.page, page);
+            self.record_error(Status::NavigationFull, self.current.page, 0);
             self.reject_flash = 2;
             self.dirty = true;
             return Status::NavigationFull;
@@ -69,7 +69,7 @@ impl<'a> Runtime<'a> {
         self.home_anim.active = false;
         self.list_anim.active = false;
         self.start_transition(outgoing, false, now);
-        if route.kind == PageType::Custom {
+        if matches!(page, PageRoute::Custom(_)) {
             self.enter_custom = Some(page);
         }
         Status::Ok
@@ -95,7 +95,7 @@ impl<'a> Runtime<'a> {
         self.list_anim.active = false;
         self.start_transition(outgoing, true, now);
         if self.current_page_type() == PageType::Custom {
-            self.enter_custom = Some(self.current.page);
+            self.enter_custom = self.current.page;
         }
         Status::Ok
     }

@@ -15,10 +15,10 @@ impl KkUi<'_> {
         clip_x: i16,
         clip_width: u16,
     ) {
-        let Some(route) = self.rt.route(state.page) else {
+        let Some(route) = state.page else {
             return;
         };
-        match route.kind {
+        match route.kind() {
             PageType::Home => pages::home_draw(
                 &mut self.rt,
                 state,
@@ -44,9 +44,9 @@ impl KkUi<'_> {
                 clip_width,
             ),
             PageType::Custom => {
-                if let Some(desc) = self.custom_page(state.page) {
+                if let Some(desc) = Self::custom_page(route) {
                     self.rt.in_callback = true;
-                    desc.on_draw(&mut self.rt, state.page, x_offset, clip_x, clip_width);
+                    desc.on_draw(&mut self.rt, route, x_offset, clip_x, clip_width);
                     self.rt.in_callback = false;
                 }
             }

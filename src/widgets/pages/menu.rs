@@ -2,7 +2,7 @@
 
 use crate::gfx::{DrawMode, Frame};
 use crate::model::{
-    InputAction, InputEvent, ItemState, MenuItem, MenuItemType, MenuPage, PageId, PageType,
+    InputAction, InputEvent, ItemState, MenuAction, MenuItem, MenuPage, PageRoute, PageType,
 };
 use crate::ui::{
     MENU_HEADER_HEIGHT, MENU_MS, PageState, ROW_HEIGHT, ROW_PITCH, Runtime, Status, ease_q12,
@@ -16,9 +16,11 @@ fn visible_rows(rt: &Runtime) -> u16 {
 }
 
 /// 取当前页面对应的菜单页。
-fn menu_page(rt: &Runtime, state: &PageState) -> &'static MenuPage {
-    let route = utils::route_page(rt, state).expect("menu page route");
-    &rt.app.menu_pages[route.index as usize]
+fn menu_page(state: &PageState) -> &'static MenuPage {
+    match state.route() {
+        PageRoute::Menu(page) => page,
+        _ => panic!("menu page route"),
+    }
 }
 
 /// 读取条目状态；没有状态表时一律正常。
@@ -38,21 +40,16 @@ fn menu_item_state(page: &MenuPage, index: u16) -> ItemState {
 /// 设置菜单条目状态；没有状态表时返回 `Unsupported`。
 pub(crate) fn menu_set_state(
     rt: &mut Runtime,
-    page_id: PageId,
+    page_route: &'static PageRoute,
     item_index: u16,
     state: ItemState,
 ) -> Status {
     if !rt.initialized {
         return Status::NotInitialized;
     }
-    let app = rt.app;
-    let Some(route) = rt.route(page_id) else {
+    let PageRoute::Menu(page) = page_route else {
         return Status::InvalidArgument;
     };
-    if route.kind != PageType::Menu {
-        return Status::InvalidArgument;
-    }
-    let page = &app.menu_pages[route.index as usize];
     if item_index as usize >= page.items.len() {
         return Status::InvalidArgument;
     }
@@ -63,7 +60,11 @@ pub(crate) fn menu_set_state(
     let mask = 3u8 << shift;
     let slot = &states[(item_index >> 2) as usize];
     slot.set((slot.get() & !mask) | ((state as u8) << shift));
-    if rt.current.page == page_id {
+    if rt
+        .current
+        .page
+        .is_some_and(|current| core::ptr::eq(current, page_route))
+    {
         rt.list_anim.active = false;
         let mut current = rt.current;
         menu_repair_focus(rt, &mut current);
@@ -130,7 +131,7 @@ fn menu_item_selectable(page: &MenuPage, item: u16) -> bool {
 
 /// 把焦点收缩到可选中条目，并同步滚动量。
 pub(crate) fn menu_repair_focus(rt: &Runtime, state: &mut PageState) {
-    let page = menu_page(rt, state);
+    let page = menu_page(state);
     let count = page.items.len() as u16;
     if state.selected > count {
         state.selected = count;
@@ -199,7 +200,7 @@ pub(crate) fn menu_animate(rt: &mut Runtime, now: u32) {
 
 /// 移动选中项。
 fn menu_move(rt: &mut Runtime, direction: i16, steps: u16, now: u32) {
-    let page = menu_page(rt, &rt.current);
+    let page = menu_page(&rt.current);
     let count = menu_visible_count(page);
     let selectable = menu_selectable_count(page);
     let mut visible = menu_item_to_visible(page, rt.current.selected);
@@ -252,25 +253,25 @@ fn menu_reject(rt: &mut Runtime, status: Status, index: u16) {
 
 /// 激活当前选中项。
 fn menu_activate(rt: &mut Runtime, now: u32) {
-    let page = menu_page(rt, &rt.current);
+    let page = menu_page(&rt.current);
     let index = rt.current.selected;
     if index == page.items.len() as u16 {
         rt.navigate_back(now);
         return;
     }
     let item = &page.items[index as usize];
-    let status = match item.kind {
-        MenuItemType::Page => rt.navigate_to(item.reference, now),
-        MenuItemType::Action => {
-            if rt.queue_event(item.reference) {
+    let status = match item.action {
+        MenuAction::Page(target) => rt.navigate_to(target, now),
+        MenuAction::Int(index) => dialog::open_int(rt, index, now),
+        MenuAction::Bool(index) => dialog::open_bool(rt, index, now),
+        MenuAction::Confirm(index) => dialog::open_confirm(rt, index, now),
+        MenuAction::Event(event) => {
+            if rt.queue_event(event) {
                 Status::Ok
             } else {
                 Status::QueueFull
             }
         }
-        MenuItemType::Int => dialog::open_int(rt, item.reference, now),
-        MenuItemType::Bool => dialog::open_bool(rt, item.reference, now),
-        MenuItemType::Confirm => dialog::open_confirm(rt, item.reference, now),
     };
     if status != Status::Ok && status != Status::Busy {
         menu_reject(rt, status, index);
@@ -301,13 +302,13 @@ fn draw_disabled(frame: &mut Frame<'_>, x: i16, y: i16) {
 
 /// 条目右列的取值文本。
 fn menu_value<'a>(rt: &Runtime, item: &MenuItem, buffer: &'a mut [u8; 20]) -> &'a str {
-    match item.kind {
-        MenuItemType::Int => {
-            let binding = &rt.app.int_bindings[item.reference as usize];
+    match item.action {
+        MenuAction::Int(reference) => {
+            let binding = &rt.app.int_bindings[reference as usize];
             utils::format_int(binding.value.get(), binding.unit, buffer)
         }
-        MenuItemType::Bool => {
-            let binding = &rt.app.bool_bindings[item.reference as usize];
+        MenuAction::Bool(reference) => {
+            let binding = &rt.app.bool_bindings[reference as usize];
             if binding.value.get() {
                 rt.app.texts.on_text
             } else {
@@ -347,7 +348,7 @@ pub(crate) fn menu_draw(
     clip_width: u16,
 ) {
     let app = rt.app;
-    let page = menu_page(rt, &state);
+    let page = menu_page(&state);
     let (scroll, focus) = if is_current && rt.list_anim.active {
         menu_animated_values(rt, rt.last_update)
     } else {
@@ -414,7 +415,7 @@ pub(crate) fn menu_draw(
             rt.frame
                 .set_clip(clip_x, MENU_HEADER_HEIGHT, clip_width, content_height);
             rt.frame.draw_text(value_x, y, value);
-        } else if item.kind == MenuItemType::Page {
+        } else if matches!(item.action, MenuAction::Page(_)) {
             menu_content_clip(
                 rt,
                 8 + x_offset,

@@ -4,13 +4,10 @@
 //! 于是编辑器按「确定」永远回到编辑态、确认框永远停在取消上。
 
 use kk_ui::{
-    App, BoolBinding, ConfirmDesc, Frame, Glyphs, Input, IntBinding, KEY_DOWN, KEY_OK, KkUi,
-    MenuItem, MenuItemType, MenuPage, PageId, PageRoute, PageType, Shared, Texts, set_font,
+    App, BoolBinding, ConfirmDesc, Frame, Glyphs, HomePage, Input, IntBinding, KEY_DOWN, KEY_OK,
+    KkUi, MenuAction, MenuItem, MenuPage, PageRoute, Shared, Texts, set_font,
 };
 
-/// 测试用页面：首页 → 菜单。
-const PAGE_HOME: PageId = 1;
-const PAGE_MENU: PageId = 2;
 /// 编辑器/确认框提交后入队的事件号。
 const EVENT_INT: u16 = 1;
 const EVENT_BOOL: u16 = 2;
@@ -30,46 +27,35 @@ static ICON: [u8; 8] = [0; 8];
 static INT_VALUE: Shared<i32> = Shared::new(10);
 static BOOL_VALUE: Shared<bool> = Shared::new(false);
 
-static ROUTES: [PageRoute; 2] = [
-    PageRoute {
-        kind: PageType::Home,
-        index: 0,
-    },
-    PageRoute {
-        kind: PageType::Menu,
-        index: 0,
-    },
-];
-
 static HOME_ITEMS: [kk_ui::HomeItem; 1] = [kk_ui::HomeItem {
     label: "Menu",
     icon: &ICON,
-    target: PAGE_MENU,
+    target: &ROUTE_MENU,
 }];
-static HOME_PAGES: [kk_ui::HomePage; 1] = [kk_ui::HomePage { items: &HOME_ITEMS }];
 
 static MENU_ITEMS: [MenuItem; 3] = [
     MenuItem {
         label: "Level",
-        kind: MenuItemType::Int,
-        reference: 0,
+        action: MenuAction::Int(0),
     },
     MenuItem {
         label: "Switch",
-        kind: MenuItemType::Bool,
-        reference: 0,
+        action: MenuAction::Bool(0),
     },
     MenuItem {
         label: "Reset",
-        kind: MenuItemType::Confirm,
-        reference: 0,
+        action: MenuAction::Confirm(0),
     },
 ];
-static MENU_PAGES: [MenuPage; 1] = [MenuPage {
+
+/// 测试用页面：首页 → 菜单。
+static ROUTE_HOME: PageRoute = PageRoute::Home(&HomePage { items: &HOME_ITEMS });
+static ROUTE_MENU: PageRoute = PageRoute::Menu(&MenuPage {
     title: "Menu",
     items: &MENU_ITEMS,
     states: None,
-}];
+});
+static ROUTES: [&PageRoute; 2] = [&ROUTE_HOME, &ROUTE_MENU];
 static INT_BINDINGS: [IntBinding; 1] = [IntBinding {
     title: "Level",
     value: &INT_VALUE,
@@ -91,12 +77,8 @@ static CONFIRMS: [ConfirmDesc; 1] = [ConfirmDesc {
 }];
 
 static APP: App = App {
-    root_page: PAGE_HOME,
+    root_page: &ROUTE_HOME,
     routes: &ROUTES,
-    home_pages: &HOME_PAGES,
-    menu_pages: &MENU_PAGES,
-    info_pages: &[],
-    custom_pages: &[],
     int_bindings: &INT_BINDINGS,
     bool_bindings: &BOOL_BINDINGS,
     confirm_descs: &CONFIRMS,

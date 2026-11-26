@@ -10,7 +10,7 @@ use super::{
     Status,
 };
 use crate::gfx::Frame;
-use crate::model::{App, EVENT_NONE, EventId, ItemState, PAGE_NONE, PageId, PageRoute, PageType};
+use crate::model::{App, EVENT_NONE, EventId, ItemState, PageRoute, PageType};
 use crate::widgets::dialog::{Overlay, OverlayType, Toast};
 use crate::widgets::pages;
 
@@ -69,8 +69,8 @@ pub struct Runtime<'a> {
     /// 是否正在执行自绘页回调。
     pub(crate) in_callback: bool,
     /// 待通知的自绘页进入/离开事件，由 [`KkUi`] 在安全时机送进回调。
-    pub(super) enter_custom: Option<PageId>,
-    pub(super) leave_custom: Option<PageId>,
+    pub(super) enter_custom: Option<&'static PageRoute>,
+    pub(super) leave_custom: Option<&'static PageRoute>,
 }
 
 impl<'a> Runtime<'a> {
@@ -106,7 +106,7 @@ impl<'a> Runtime<'a> {
             event_count: 0,
             error: ErrorInfo {
                 code: Status::Ok,
-                page: 0,
+                page: None,
                 index: 0,
             },
             last_update: 0,
@@ -135,23 +135,16 @@ impl<'a> Runtime<'a> {
         &mut self.frame
     }
 
-    /// 当前页面编号。
-    pub fn current_page(&self) -> PageId {
+    /// 当前页面句柄；尚未初始化时为 `None`。
+    pub fn current_page(&self) -> Option<&'static PageRoute> {
         self.current.page
-    }
-
-    /// 页面编号对应的路由。
-    pub(crate) fn route(&self, page: PageId) -> Option<PageRoute> {
-        if page == PAGE_NONE {
-            return None;
-        }
-        self.app.routes.get(page as usize - 1).copied()
     }
 
     /// 当前页面类型。
     pub(crate) fn current_page_type(&self) -> PageType {
-        self.route(self.current.page)
-            .map(|route| route.kind)
+        self.current
+            .page
+            .map(PageRoute::kind)
             .unwrap_or(PageType::Home)
     }
 
@@ -174,18 +167,18 @@ impl<'a> Runtime<'a> {
         self.initialized = true;
         self.dirty = true;
         if self.current_page_type() == PageType::Custom {
-            self.enter_custom = Some(self.current.page);
+            self.enter_custom = self.current.page;
         }
         Status::Ok
     }
 
     /// 新建一个页面状态，菜单页会先把焦点收缩到合法条目。
-    pub(crate) fn reset_page_state(&self, page: PageId) -> PageState {
+    pub(crate) fn reset_page_state(&self, page: &'static PageRoute) -> PageState {
         let mut state = PageState {
-            page,
+            page: Some(page),
             ..PageState::default()
         };
-        if self.route(page).map(|route| route.kind) == Some(PageType::Menu) {
+        if page.kind() == PageType::Menu {
             pages::menu_repair_focus(self, &mut state);
         }
         state
@@ -228,10 +221,10 @@ impl<'a> Runtime<'a> {
     /// 设置菜单条目状态。
     pub fn set_menu_item_state(
         &mut self,
-        page_id: PageId,
+        page_route: &'static PageRoute,
         item_index: u16,
         state: ItemState,
     ) -> Status {
-        pages::menu_set_state(self, page_id, item_index, state)
+        pages::menu_set_state(self, page_route, item_index, state)
     }
 }

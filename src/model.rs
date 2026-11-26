@@ -6,17 +6,13 @@
 use crate::ui::CustomPageHandler;
 use core::cell::Cell;
 
-/// 页面编号，`0` 表示无页面。
-pub type PageId = u16;
 /// 事件编号，`0` 表示无事件。
 pub type EventId = u16;
-/// 一页自绘页：路由 `index` 指向该表项，回调由它接收。
+/// 一页自绘页：路由持有它，回调由它接收。
 ///
 /// 页面状态靠实现内部的 `Cell`/`Shared` 自行维护，所以要求 `Sync` 才能放进常量表。
 pub type CustomPage = &'static (dyn CustomPageHandler + Sync);
 
-/// 无页面。
-pub const PAGE_NONE: PageId = 0;
 /// 无事件。
 pub const EVENT_NONE: EventId = 0;
 
@@ -182,13 +178,30 @@ pub enum PageType {
     Custom,
 }
 
-/// 页面编号到页面表下标的映射。
-#[derive(Clone, Copy)]
-pub struct PageRoute {
-    /// 页面类型。
-    pub kind: PageType,
-    /// 对应页面表的下标。
-    pub index: u16,
+/// 一条路由：页面描述本身，同时充当页面句柄——`&'static PageRoute` 就是页面身份。
+///
+/// 每个页面只需一个 `static`，引用它的地方一律用 `&ROUTE_XXX`，没有编号也没有下标。
+pub enum PageRoute {
+    /// 首页图标选择器。
+    Home(&'static HomePage),
+    /// 菜单。
+    Menu(&'static MenuPage),
+    /// 只读信息页。
+    Info(&'static InfoPage),
+    /// 应用自绘页。
+    Custom(CustomPage),
+}
+
+impl PageRoute {
+    /// 页面类型标签。
+    pub fn kind(&self) -> PageType {
+        match self {
+            Self::Home(_) => PageType::Home,
+            Self::Menu(_) => PageType::Menu,
+            Self::Info(_) => PageType::Info,
+            Self::Custom(_) => PageType::Custom,
+        }
+    }
 }
 
 /// 首页的一个图标入口。
@@ -197,8 +210,8 @@ pub struct HomeItem {
     pub label: &'static str,
     /// 32×32 XBM 图标。
     pub icon: &'static [u8],
-    /// 选中后进入的页面编号。
-    pub target: PageId,
+    /// 选中后进入的页面。
+    pub target: &'static PageRoute,
 }
 
 /// 一组首页入口。
@@ -207,29 +220,27 @@ pub struct HomePage {
     pub items: &'static [HomeItem],
 }
 
-/// 菜单项类型。
-#[derive(Clone, Copy, PartialEq, Eq)]
-pub enum MenuItemType {
+/// 菜单项被激活后做什么。
+#[derive(Clone, Copy)]
+pub enum MenuAction {
     /// 进入子页面。
-    Page,
+    Page(&'static PageRoute),
     /// 触发事件。
-    Action,
-    /// 整数编辑器。
-    Int,
-    /// 开关编辑器。
-    Bool,
-    /// 确认框。
-    Confirm,
+    Event(EventId),
+    /// 整数编辑器，参数是绑定下标。
+    Int(u16),
+    /// 开关编辑器，参数是绑定下标。
+    Bool(u16),
+    /// 确认框，参数是描述表下标。
+    Confirm(u16),
 }
 
 /// 菜单项。
 pub struct MenuItem {
     /// 标签。
     pub label: &'static str,
-    /// 类型。
-    pub kind: MenuItemType,
-    /// 页面编号、事件编号或绑定下标，含义由类型决定。
-    pub reference: u16,
+    /// 激活后的动作。
+    pub action: MenuAction,
 }
 
 /// 菜单页。
@@ -327,18 +338,10 @@ pub struct Texts {
 
 /// 整个应用描述。
 pub struct App {
-    /// 启动页编号。
-    pub root_page: PageId,
-    /// 路由表。
-    pub routes: &'static [PageRoute],
-    /// 首页入口表。
-    pub home_pages: &'static [HomePage],
-    /// 菜单页表。
-    pub menu_pages: &'static [MenuPage],
-    /// 信息页表。
-    pub info_pages: &'static [InfoPage],
-    /// 自绘页表。
-    pub custom_pages: &'static [CustomPage],
+    /// 启动页。
+    pub root_page: &'static PageRoute,
+    /// 页面清单；顺序无关，只在初始化时用于校验。
+    pub routes: &'static [&'static PageRoute],
     /// 整数绑定表。
     pub int_bindings: &'static [IntBinding],
     /// 开关绑定表。

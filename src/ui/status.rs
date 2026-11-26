@@ -1,7 +1,7 @@
 //! 操作结果与错误记录。
 
 use super::Runtime;
-use crate::model::PageId;
+use crate::model::PageRoute;
 
 /// 操作结果。
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
@@ -48,21 +48,26 @@ impl Status {
 pub struct ErrorInfo {
     /// 错误码。
     pub code: Status,
-    /// 出错时所在页面。
-    pub page: PageId,
+    /// 出错时所在页面；尚未初始化时为 `None`。
+    pub page: Option<&'static PageRoute>,
     /// 相关条目下标。
     pub index: u16,
 }
 
 impl<'a> Runtime<'a> {
     /// 记录一条错误，供应用轮询。
-    pub(crate) fn record_error(&mut self, code: Status, page: PageId, index: u16) {
+    pub(crate) fn record_error(
+        &mut self,
+        code: Status,
+        page: Option<&'static PageRoute>,
+        index: u16,
+    ) {
         self.error = ErrorInfo { code, page, index };
         self.error_valid = true;
     }
 
     /// 记录一条配置错误并返回 `ConfigError`。
-    pub(super) fn config_error(&mut self, page: PageId, index: u16) -> Status {
+    pub(super) fn config_error(&mut self, page: Option<&'static PageRoute>, index: u16) -> Status {
         self.record_error(Status::ConfigError, page, index);
         Status::ConfigError
     }
