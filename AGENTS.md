@@ -64,7 +64,6 @@
   引入 `strum` 前先确认是否愿意破这个前提。
 - **`assets/` 是内嵌资源的唯一真源**：改 `assets/fonts/unifont.bdf` 就等于改二进制。
 - **版本号唯一真源 = `Cargo.toml` 的 `version`**；发版时补 `changelog/v<version>.md`（中文）。
-  当前 `Cargo.toml` 是 0.2.0 而已有 changelog 是 `v0.3.0.md`（未发布）——发版前对齐这两处。
 
 ## 注释：`///` 与它修饰的 item 绑定
 
