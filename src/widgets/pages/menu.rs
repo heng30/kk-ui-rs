@@ -1,8 +1,10 @@
 //! 菜单页：可滚动条目列表、虚拟返回项、隐禁状态与右侧取值列。
 
 use crate::gfx::{DrawMode, Frame};
-use crate::model::{InputAction, InputEvent, ItemState, MenuItem, MenuItemType, MenuPage, PageType};
-use crate::runtime::{
+use crate::model::{
+    InputAction, InputEvent, ItemState, MenuItem, MenuItemType, MenuPage, PageId, PageType,
+};
+use crate::ui::{
     MENU_HEADER_HEIGHT, MENU_MS, PageState, ROW_HEIGHT, ROW_PITCH, Runtime, Status, ease_q12,
     lerp_q12,
 };
@@ -31,6 +33,44 @@ fn menu_item_state(page: &MenuPage, index: u16) -> ItemState {
         2 => ItemState::Disabled,
         _ => ItemState::Reserved,
     }
+}
+
+/// 设置菜单条目状态；没有状态表时返回 `Unsupported`。
+pub(crate) fn menu_set_state(
+    rt: &mut Runtime,
+    page_id: PageId,
+    item_index: u16,
+    state: ItemState,
+) -> Status {
+    if !rt.initialized {
+        return Status::NotInitialized;
+    }
+    let app = rt.app;
+    let Some(route) = rt.route(page_id) else {
+        return Status::InvalidArgument;
+    };
+    if route.kind != PageType::Menu {
+        return Status::InvalidArgument;
+    }
+    let page = &app.menu_pages[route.index as usize];
+    if item_index as usize >= page.items.len() {
+        return Status::InvalidArgument;
+    }
+    let Some(states) = page.states else {
+        return Status::Unsupported;
+    };
+    let shift = (item_index & 3) * 2;
+    let mask = 3u8 << shift;
+    let slot = &states[(item_index >> 2) as usize];
+    slot.set((slot.get() & !mask) | ((state as u8) << shift));
+    if rt.current.page == page_id {
+        rt.list_anim.active = false;
+        let mut current = rt.current;
+        menu_repair_focus(rt, &mut current);
+        rt.current = current;
+    }
+    rt.dirty = true;
+    Status::Ok
 }
 
 /// 可见条目数（含虚拟返回项）。
@@ -328,8 +368,7 @@ pub(crate) fn menu_draw(
     for visible in 0..visible_count {
         let item_index = menu_visible_to_item(page, visible);
         let y = MENU_HEADER_HEIGHT + visible as i16 * ROW_PITCH - (scroll / 256) as i16;
-        if y >= MENU_HEADER_HEIGHT + rows as i16 * ROW_PITCH
-            || y + ROW_PITCH <= MENU_HEADER_HEIGHT
+        if y >= MENU_HEADER_HEIGHT + rows as i16 * ROW_PITCH || y + ROW_PITCH <= MENU_HEADER_HEIGHT
         {
             continue;
         }

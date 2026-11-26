@@ -18,7 +18,7 @@ extern crate std;
 mod font;
 mod gfx;
 mod model;
-mod runtime;
+mod ui;
 mod widgets;
 
 #[cfg(feature = "cjk-fonts")]
@@ -33,5 +33,5 @@ pub use model::{
     Input, InputAction, InputEvent, InputSource, IntBinding, ItemState, KEY_DOWN, KEY_OK, KEY_UP,
     MenuItem, MenuItemType, MenuPage, PAGE_NONE, PageId, PageRoute, PageType, Shared, Text, Texts,
 };
-pub use runtime::{CustomPage, ErrorInfo, KkUi, Runtime, Status};
+pub use ui::{CustomPage, ErrorInfo, KkUi, Runtime, Status};
 pub use widgets::{draw_focus, draw_progress_bar, draw_switch, utils::format_int};

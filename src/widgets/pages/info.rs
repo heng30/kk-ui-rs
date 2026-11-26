@@ -2,9 +2,8 @@
 
 use crate::gfx::{DrawMode, Frame};
 use crate::model::{InfoPage, InputAction, InputEvent, PageType};
-use crate::runtime::{
-    INFO_HEADER_HEIGHT, INFO_SCROLL_MS, PageState, ROW_PITCH, Runtime, ease_q12, lerp_q12,
-    round_q8,
+use crate::ui::{
+    INFO_HEADER_HEIGHT, INFO_SCROLL_MS, PageState, ROW_PITCH, Runtime, ease_q12, lerp_q12, round_q8,
 };
 use crate::widgets::utils;
 

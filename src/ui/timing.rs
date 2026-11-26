@@ -1,0 +1,44 @@
+//! 时长、布局与定点常量。
+//!
+//! 组件用到的时长也在这里：页面与弹窗只读常量，不自己定义节奏。
+
+/// 按键消抖时间。
+pub(crate) const KEY_DEBOUNCE_MS: u32 = 20;
+/// 长按重复的首次延迟。
+pub(crate) const KEY_REPEAT_DELAY_MS: u32 = 450;
+/// 最小出帧间隔。
+pub(crate) const FRAME_INTERVAL_MS: u32 = 20;
+/// 首页切换动画时长。
+pub(crate) const HOME_MS: u32 = 300;
+/// 菜单滚动动画时长。
+pub(crate) const MENU_MS: u32 = 200;
+/// 页面切换动画时长。
+pub(crate) const PAGE_MS: u32 = 220;
+/// 信息页滚动动画时长。
+pub(crate) const INFO_SCROLL_MS: u32 = 180;
+/// 弹窗打开动画时长。
+pub(crate) const DIALOG_OPEN_MS: u32 = 180;
+/// 弹窗关闭动画时长。
+pub(crate) const DIALOG_CLOSE_MS: u32 = 150;
+/// 焦点框补间时长。
+pub(crate) const FOCUS_MS: u32 = 160;
+/// 整数换值动画时长。
+pub(crate) const INT_VALUE_MS: u32 = 100;
+/// 开关换值动画时长。
+pub(crate) const BOOL_VALUE_MS: u32 = 120;
+/// Toast 滑入滑出时长。
+pub(crate) const TOAST_MS: u32 = 120;
+/// Q12 定点数的 1.0。
+pub(crate) const Q12_ONE: u16 = 4096;
+/// 菜单标题栏高度：1 px 顶部留白 + 16 px 字形 + 1 px 底部留白。
+pub(crate) const MENU_HEADER_HEIGHT: i16 = 18;
+/// 信息页标题栏高度：同菜单，容纳 16 px 字形。
+pub(crate) const INFO_HEADER_HEIGHT: i16 = 18;
+/// 列表行高：一个 16×16 字形的占位高度。
+pub(crate) const ROW_HEIGHT: i16 = 16;
+/// 列表条目之间的垂直空隙（像素）。
+pub(crate) const ROW_GAP: i16 = 2;
+/// 列表行距：行高加空隙，菜单与信息页的滚动/命中/滚动条都按它算。
+pub(crate) const ROW_PITCH: i16 = ROW_HEIGHT + ROW_GAP;
+/// 页面切换时旧页面的视差位移。
+pub(crate) const PAGE_PARALLAX: i16 = 32;

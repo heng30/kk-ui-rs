@@ -7,13 +7,14 @@ mod bool_editor;
 mod confirm;
 mod int_editor;
 mod message;
+mod state;
 mod toast;
 
 use crate::gfx::{DrawMode, Frame};
 use crate::model::{EVENT_NONE, EventId, InputAction, InputEvent, PageType};
-use crate::runtime::{
-    BOOL_VALUE_MS, DIALOG_CLOSE_MS, DIALOG_OPEN_MS, DialogFocus, FOCUS_MS, INT_VALUE_MS,
-    MENU_HEADER_HEIGHT, OverlayType, Q12_ONE, Runtime, Status, ease_q12, lerp_q12, round_q8,
+use crate::ui::{
+    BOOL_VALUE_MS, DIALOG_CLOSE_MS, DIALOG_OPEN_MS, FOCUS_MS, INT_VALUE_MS, MENU_HEADER_HEIGHT,
+    Q12_ONE, Runtime, Status, ease_q12, lerp_q12, round_q8,
 };
 use crate::widgets::utils;
 
@@ -21,6 +22,7 @@ pub(crate) use bool_editor::open as open_bool;
 pub(crate) use confirm::open as open_confirm;
 pub(crate) use int_editor::open as open_int;
 pub(crate) use message::open as open_message;
+pub(crate) use state::{DialogFocus, Overlay, OverlayType, Toast};
 pub(crate) use toast::draw as draw_toast;
 pub(crate) use toast::open as toast_open;
 

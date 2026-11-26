@@ -14,8 +14,8 @@ MANIFEST := $(ROOT)/Cargo.toml
 DIR ?= examples/sim
 OUT ?= $(DIR)/assets/font
 
-TOOL ?= cargo run --quiet --manifest-path $(MANIFEST) --bin kkui-tool --features tool --
-SIM := cargo run --quiet --manifest-path $(MANIFEST) --example sim --features sim
+TOOL ?= cargo run --manifest-path $(MANIFEST) --bin kkui-tool --features tool --
+SIM := cargo run --manifest-path $(MANIFEST) --example sim --features sim
 SNAPSHOT ?= /tmp/sim.png
 STEPS ?= 40
 

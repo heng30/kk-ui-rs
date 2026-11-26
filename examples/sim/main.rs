@@ -13,11 +13,10 @@
 
 mod app;
 
-use std::error::Error;
-use std::path::{Path, PathBuf};
-
 use kk_ui::sim;
 use kk_ui::{Frame, Glyphs, Input, KkUi, set_font};
+use std::error::Error;
+use std::path::{Path, PathBuf};
 
 /// `kkui-tool font` 生成的字模，每 32 字节一个字。
 static BITMAPS: &[u8] = include_bytes!("assets/font/font.bin");

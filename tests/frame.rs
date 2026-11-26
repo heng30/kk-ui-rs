@@ -94,10 +94,18 @@ fn expand_row_repeats_pixels_integer_times() {
     assert_eq!(row, [0, 0, 1, 1, 1, 1, 0, 0]);
 
     let mut short = [0u8; 5];
-    assert_eq!(frame.expand_row(0, 2, 1u8, 0u8, &mut short), 4, "only two columns fit");
+    assert_eq!(
+        frame.expand_row(0, 2, 1u8, 0u8, &mut short),
+        4,
+        "only two columns fit"
+    );
     assert_eq!(short, [0, 0, 1, 1, 0]);
 
     assert_eq!(frame.expand_row(0, 0, 1u8, 0u8, &mut row), 0, "zero scale");
-    assert_eq!(frame.expand_row(-1, 2, 1u8, 0u8, &mut row), 8, "off-canvas row");
+    assert_eq!(
+        frame.expand_row(-1, 2, 1u8, 0u8, &mut row),
+        8,
+        "off-canvas row"
+    );
     assert_eq!(row, [0u8; 8], "off-canvas row must be all off");
 }

@@ -1,8 +1,9 @@
 //! 开关编辑器弹窗：关/开文字与滑动滑块。
 
+use super::{Overlay, OverlayType};
 use crate::gfx::Frame;
 use crate::model::{EVENT_NONE, InputEvent, InputSource};
-use crate::runtime::{Overlay, OverlayType, Q12_ONE, Runtime, Status};
+use crate::ui::{Q12_ONE, Runtime, Status};
 use crate::widgets::utils;
 
 /// 打开开关编辑器。

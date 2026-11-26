@@ -1,8 +1,7 @@
 //! 贴底提示条：先滑入，到期后滑出。
 
 use crate::gfx::DrawMode;
-use crate::runtime::{Q12_ONE, Runtime, Status, TOAST_MS, ease_q12};
-
+use crate::ui::{Q12_ONE, Runtime, Status, TOAST_MS, ease_q12};
 use crate::widgets::utils::draw_centered;
 
 /// 打开 Toast；`duration` 为 0 时用默认时长。

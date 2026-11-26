@@ -17,15 +17,13 @@
 //! 底部按键栏对应 `KEY_UP` / `KEY_DOWN` / `KEY_OK` 与截图，键盘同效：
 //! ↑/←/k/h 上、↓/→/j/l 下、回车确定、S 截图（存 `sim-<n>.png`）。
 
+use crate::{Frame, KEY_DOWN, KEY_OK, KEY_UP};
+use eframe::egui;
 use std::boxed::Box;
 use std::error::Error;
 use std::path::{Path, PathBuf};
 use std::time::{Duration, Instant};
 use std::vec::Vec;
-
-use eframe::egui;
-
-use crate::{Frame, KEY_DOWN, KEY_OK, KEY_UP};
 
 /// 底部按钮的字号（像素），是 egui 默认 14 的两倍。
 const BUTTON_TEXT_SIZE: f32 = 28.0;

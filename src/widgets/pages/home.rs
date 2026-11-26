@@ -2,7 +2,7 @@
 
 use crate::gfx::DrawMode;
 use crate::model::{HomePage, InputAction, InputEvent, PageType};
-use crate::runtime::{HOME_MS, PageState, Runtime, ease_q12, lerp_q12, round_q8};
+use crate::ui::{HOME_MS, PageState, Runtime, ease_q12, lerp_q12, round_q8};
 
 /// 首页标签框的宽度上限：画布宽度留 4 px 边距。
 fn home_label_limit(rt: &Runtime) -> i32 {

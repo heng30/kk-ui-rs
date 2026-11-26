@@ -154,9 +154,7 @@ kk_ui::sim::run(
 截图是 8 位灰度 PNG，`kk_ui::sim::save_png(frame, scale, path)` 也可以直接调，
 无头调试时不必开窗口。
 
-`examples/sim/` 是完整例子：`app.rs` 与 `assets/` 是 `../ili9341-lcd-kkui/src/` 里
-应用描述表与图标的副本（改一边记得同步另一边）。无头模式
-`cargo run --example sim --features "sim cjk-fonts" -- --snapshot out.png --steps 40`
+`examples/sim/` 是完整例子。无头模式 `cargo run --example sim --features "sim cjk-fonts" -- --snapshot out.png --steps 40`
 让 Demo 自己走 40 拍再落盘。
 
 ## 许可证

@@ -5,10 +5,10 @@
 //! 改了一边记得同步另一边。
 
 use kk_ui::{
-    App, BoolBinding, ConfirmDesc, CustomPage, DrawMode, EventId, Frame, HomeItem,
-    HomePage, InfoPage, InfoRow, InputAction, InputEvent, IntBinding, ItemState, KEY_DOWN, KEY_OK,
-    KkUi, MenuItem, MenuItemType, MenuPage, PageId, PageRoute, PageType, Runtime, Shared, Text,
-    Texts, draw_progress_bar,
+    App, BoolBinding, ConfirmDesc, CustomPage, DrawMode, EventId, Frame, HomeItem, HomePage,
+    InfoPage, InfoRow, InputAction, InputEvent, IntBinding, ItemState, KEY_DOWN, KEY_OK, KkUi,
+    MenuItem, MenuItemType, MenuPage, PageId, PageRoute, PageType, Runtime, Shared, Text, Texts,
+    draw_progress_bar,
 };
 
 /// 页面：首页。
@@ -421,6 +421,109 @@ impl Default for Wave {
     }
 }
 
+impl CustomPage for Wave {
+    fn on_enter(&mut self, _ui: &mut Runtime, _page: PageId) {
+        let now = APP_NOW.get();
+        self.reset(now);
+    }
+
+    fn on_input(&mut self, ui: &mut Runtime, _page: PageId, event: InputEvent) {
+        match event.action {
+            InputAction::Ok => {
+                ui.custom_request_close();
+            }
+            InputAction::Up => {
+                self.manual = true;
+                self.progress = self.progress.saturating_sub(event.steps);
+                update_progress_text(self.progress, self.manual);
+                ui.invalidate();
+            }
+            InputAction::Down => {
+                self.manual = true;
+                self.progress = (self.progress + event.steps).min(100);
+                update_progress_text(self.progress, self.manual);
+                ui.invalidate();
+            }
+        }
+    }
+
+    fn on_tick(&mut self, _ui: &mut Runtime, _page: PageId, now: u32) -> bool {
+        let interval = ANIMATION_INTERVAL.get().max(1) as u32;
+        let next = (now.wrapping_sub(self.entered_at) / interval % 32) as u16;
+        let mut changed = next != self.phase;
+        let elapsed = now.wrapping_sub(self.fps_started);
+        self.phase = next;
+        if !self.manual {
+            let progress = (now.wrapping_sub(self.entered_at) / 50 % 101) as u16;
+            if progress != self.progress {
+                self.progress = progress;
+                update_progress_text(self.progress, self.manual);
+                changed = true;
+            }
+        }
+        if elapsed >= 1000 {
+            let fps = ((self.draw_count * 1000 + elapsed / 2) / elapsed).min(999);
+            let mut buffer = [0u8; 20];
+            FPS_TEXT.set(format_u32(fps, "", &mut buffer));
+            self.draw_count = 0;
+            self.fps_started = now;
+            changed = true;
+        }
+        changed
+    }
+
+    fn on_draw(
+        &mut self,
+        ui: &mut Runtime,
+        _page: PageId,
+        x_offset: i16,
+        clip_x: i16,
+        clip_width: u16,
+    ) {
+        if self.draw_epoch != UPDATE_EPOCH.get() {
+            self.draw_epoch = UPDATE_EPOCH.get();
+            self.draw_count += 1;
+        }
+        let frame: &mut Frame<'_> = ui.frame_mut();
+        let (width, height) = (frame.width(), frame.height());
+        frame.set_clip(clip_x, 0, clip_width, height as u16);
+        frame.draw_text(4 + x_offset, 1, "波形");
+        frame.draw_text(width - 68 + x_offset, 1, "FPS:");
+        FPS_TEXT.with(|text| {
+            frame.draw_text(width - 36 + x_offset, 1, text);
+        });
+        frame.draw_line(width - 11 + x_offset, 5, width - 5 + x_offset, 11);
+        frame.draw_line(width - 5 + x_offset, 5, width - 11 + x_offset, 11);
+        frame.set_draw_mode(DrawMode::Xor);
+        frame.draw_rbox(width - 15 + x_offset, 1, 14, 14, 3);
+        frame.set_draw_mode(DrawMode::Set);
+        let wave: [i16; 16] = [0, -3, -7, -11, -7, -3, 0, 3, 7, 11, 7, 3, 0, -2, -1, 0];
+        let base = height / 2;
+        let mut previous_y = base;
+        for x in 0..width {
+            let index = (x as usize + self.phase as usize) & 15;
+            let y = base + wave[index] * 8 / 11;
+            if x != 0 {
+                frame.draw_line(x - 1 + x_offset, previous_y, x + x_offset, y);
+            }
+            previous_y = y;
+        }
+        PROGRESS_TEXT.with(|text| {
+            frame.draw_text(10 + x_offset, height - 32, text);
+        });
+        draw_progress_bar(
+            frame,
+            10 + x_offset,
+            height - 16,
+            (width - 20) as u16,
+            8,
+            self.progress,
+            100,
+        );
+        frame.reset_clip();
+    }
+}
+
 fn update_progress_text(progress: u16, manual: bool) {
     let mut buffer = [0u8; 20];
     let prefix = if manual { "手动 " } else { "自动 " };
@@ -674,108 +777,5 @@ pub fn process_events<C: CustomPage>(ui: &mut KkUi<C>) {
     if !BRIGHTNESS_REPORTED.get() {
         BRIGHTNESS_REPORTED.set(true);
         report_brightness_unsupported(ui);
-    }
-}
-
-impl CustomPage for Wave {
-    fn on_enter(&mut self, _ui: &mut Runtime, _page: PageId) {
-        let now = APP_NOW.get();
-        self.reset(now);
-    }
-
-    fn on_input(&mut self, ui: &mut Runtime, _page: PageId, event: InputEvent) {
-        match event.action {
-            InputAction::Ok => {
-                ui.custom_request_close();
-            }
-            InputAction::Up => {
-                self.manual = true;
-                self.progress = self.progress.saturating_sub(event.steps);
-                update_progress_text(self.progress, self.manual);
-                ui.invalidate();
-            }
-            InputAction::Down => {
-                self.manual = true;
-                self.progress = (self.progress + event.steps).min(100);
-                update_progress_text(self.progress, self.manual);
-                ui.invalidate();
-            }
-        }
-    }
-
-    fn on_tick(&mut self, _ui: &mut Runtime, _page: PageId, now: u32) -> bool {
-        let interval = ANIMATION_INTERVAL.get().max(1) as u32;
-        let next = (now.wrapping_sub(self.entered_at) / interval % 32) as u16;
-        let mut changed = next != self.phase;
-        let elapsed = now.wrapping_sub(self.fps_started);
-        self.phase = next;
-        if !self.manual {
-            let progress = (now.wrapping_sub(self.entered_at) / 50 % 101) as u16;
-            if progress != self.progress {
-                self.progress = progress;
-                update_progress_text(self.progress, self.manual);
-                changed = true;
-            }
-        }
-        if elapsed >= 1000 {
-            let fps = ((self.draw_count * 1000 + elapsed / 2) / elapsed).min(999);
-            let mut buffer = [0u8; 20];
-            FPS_TEXT.set(format_u32(fps, "", &mut buffer));
-            self.draw_count = 0;
-            self.fps_started = now;
-            changed = true;
-        }
-        changed
-    }
-
-    fn on_draw(
-        &mut self,
-        ui: &mut Runtime,
-        _page: PageId,
-        x_offset: i16,
-        clip_x: i16,
-        clip_width: u16,
-    ) {
-        if self.draw_epoch != UPDATE_EPOCH.get() {
-            self.draw_epoch = UPDATE_EPOCH.get();
-            self.draw_count += 1;
-        }
-        let frame: &mut Frame<'_> = ui.frame_mut();
-        let (width, height) = (frame.width(), frame.height());
-        frame.set_clip(clip_x, 0, clip_width, height as u16);
-        frame.draw_text(4 + x_offset, 1, "波形");
-        frame.draw_text(width - 68 + x_offset, 1, "FPS:");
-        FPS_TEXT.with(|text| {
-            frame.draw_text(width - 36 + x_offset, 1, text);
-        });
-        frame.draw_line(width - 11 + x_offset, 5, width - 5 + x_offset, 11);
-        frame.draw_line(width - 5 + x_offset, 5, width - 11 + x_offset, 11);
-        frame.set_draw_mode(DrawMode::Xor);
-        frame.draw_rbox(width - 15 + x_offset, 1, 14, 14, 3);
-        frame.set_draw_mode(DrawMode::Set);
-        let wave: [i16; 16] = [0, -3, -7, -11, -7, -3, 0, 3, 7, 11, 7, 3, 0, -2, -1, 0];
-        let base = height / 2;
-        let mut previous_y = base;
-        for x in 0..width {
-            let index = (x as usize + self.phase as usize) & 15;
-            let y = base + wave[index] * 8 / 11;
-            if x != 0 {
-                frame.draw_line(x - 1 + x_offset, previous_y, x + x_offset, y);
-            }
-            previous_y = y;
-        }
-        PROGRESS_TEXT.with(|text| {
-            frame.draw_text(10 + x_offset, height - 32, text);
-        });
-        draw_progress_bar(
-            frame,
-            10 + x_offset,
-            height - 16,
-            (width - 20) as u16,
-            8,
-            self.progress,
-            100,
-        );
-        frame.reset_clip();
     }
 }

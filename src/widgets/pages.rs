@@ -9,4 +9,4 @@ mod menu;
 
 pub(crate) use home::{home_animate, home_draw, home_input};
 pub(crate) use info::{info_animate, info_draw, info_input};
-pub(crate) use menu::{menu_animate, menu_draw, menu_input, menu_repair_focus};
+pub(crate) use menu::{menu_animate, menu_draw, menu_input, menu_repair_focus, menu_set_state};

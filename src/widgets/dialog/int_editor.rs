@@ -1,9 +1,9 @@
 //! 整数编辑器弹窗：草稿值按步长增减，新旧值纵向滚动切换。
 
+use super::{Overlay, OverlayType};
 use crate::gfx::Frame;
 use crate::model::{EVENT_NONE, InputAction, InputEvent, IntBinding};
-use crate::runtime::{Overlay, OverlayType, Q12_ONE, Runtime, Status};
-
+use crate::ui::{Q12_ONE, Runtime, Status};
 use crate::widgets::utils::{BUFFER_LEN, draw_centered, format_int};
 
 /// 打开整数编辑器。
@@ -61,13 +61,7 @@ pub(crate) fn draw(rt: &mut Runtime<'_>, layout: &super::Layout) {
     let overlay = rt.overlay;
     let binding = &app.int_bindings[overlay.reference as usize];
     super::draw_title(rt, layout, binding.title);
-    draw_value(
-        &overlay,
-        binding.unit,
-        &mut rt.frame,
-        layout.dx,
-        layout.dy,
-    );
+    draw_value(&overlay, binding.unit, &mut rt.frame, layout.dx, layout.dy);
     super::draw_buttons(rt, layout, true);
     if rt.overlay.editing {
         let binding = &app.int_bindings[rt.overlay.reference as usize];

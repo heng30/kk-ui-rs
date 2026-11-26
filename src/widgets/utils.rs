@@ -2,7 +2,7 @@
 
 use crate::gfx::Frame;
 use crate::model::PageRoute;
-use crate::runtime::{PageState, Runtime};
+use crate::ui::{PageState, Runtime};
 
 /// 数字与单位后缀的缓冲容量。
 pub(crate) const BUFFER_LEN: usize = 20;

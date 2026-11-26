@@ -8,9 +8,8 @@ use kk_ui::cjk::GLYPHS;
 #[test]
 fn common_han_and_punctuation_are_embedded() {
     let sample = [
-        '中', '文', '汉', '字', '常', '用',
-        '，', '。', '、', '：', '；', '！', '？', '“', '”', '‘', '’', '（', '）', '《', '》',
-        '—', '…', '·', '　', '％', '０',
+        '中', '文', '汉', '字', '常', '用', '，', '。', '、', '：', '；', '！', '？', '“', '”',
+        '‘', '’', '（', '）', '《', '》', '—', '…', '·', '　', '％', '０',
     ];
     for c in sample {
         assert!(GLYPHS.glyph(c).is_some(), "missing glyph: {c}");
@@ -24,19 +23,28 @@ fn ascii_letters_and_symbols_are_embedded() {
     for c in ['A', 'z', '0', '%', ':', ' ', '!', '~'] {
         assert!(GLYPHS.glyph(c).is_some(), "missing ascii glyph: {c}");
     }
-    assert!(GLYPHS.width('A').is_some() && GLYPHS.width('A').unwrap() <= 8, "ascii is half width");
+    assert!(
+        GLYPHS.width('A').is_some() && GLYPHS.width('A').unwrap() <= 8,
+        "ascii is half width"
+    );
 }
 
 #[test]
 fn missing_characters_return_none() {
     assert!(GLYPHS.glyph('\u{1F600}').is_none(), "emoji is out of range");
-    assert!(GLYPHS.glyph('\u{4DBF}').is_none(), "CJK ext-B is out of GB2312 range");
+    assert!(
+        GLYPHS.glyph('\u{4DBF}').is_none(),
+        "CJK ext-B is out of GB2312 range"
+    );
 }
 
 #[test]
 fn glyphs_are_not_blank_and_draw_onto_the_canvas() {
     let bitmap = GLYPHS.glyph('中').expect("han glyph");
-    assert!(bitmap.iter().any(|byte| *byte != 0), "glyph must have pixels");
+    assert!(
+        bitmap.iter().any(|byte| *byte != 0),
+        "glyph must have pixels"
+    );
 
     let mut buffer = [0u8; Frame::buffer_len(64, 32)];
     let mut frame = Frame::new(&mut buffer, 64, 32);
