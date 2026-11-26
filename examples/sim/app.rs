@@ -23,6 +23,8 @@ pub const PAGE_WAVE: PageId = 4;
 pub const PAGE_ABOUT: PageId = 5;
 /// 页面：组件演示。
 pub const PAGE_COMPONENTS: PageId = 6;
+/// 页面：数学。
+pub const PAGE_MATH: PageId = 7;
 
 /// 绑定下标：屏幕亮度。
 const INT_BRIGHTNESS: u16 = 0;
@@ -67,6 +69,7 @@ static ICON_SETTINGS: &[u8] = include_bytes!("assets/icon0.bin");
 static ICON_MONITOR: &[u8] = include_bytes!("assets/icon1.bin");
 static ICON_WAVE: &[u8] = include_bytes!("assets/icon2.bin");
 static ICON_ABOUT: &[u8] = include_bytes!("assets/icon3.bin");
+static ICON_MATH: &[u8] = include_bytes!("assets/math.bin");
 
 static BRIGHTNESS: Shared<i32> = Shared::new(80);
 static ANIMATION_INTERVAL: Shared<i32> = Shared::new(20);
@@ -106,7 +109,7 @@ static PENDING_TOAST: Shared<Option<(&'static str, u32)>> = Shared::new(None);
 /// 亮度控制只上报一次「不支持」。
 static BRIGHTNESS_REPORTED: Shared<bool> = Shared::new(false);
 
-static HOME_ITEMS: [HomeItem; 4] = [
+static HOME_ITEMS: [HomeItem; 5] = [
     HomeItem {
         label: "设置",
         icon: ICON_SETTINGS,
@@ -121,6 +124,11 @@ static HOME_ITEMS: [HomeItem; 4] = [
         label: "波形",
         icon: ICON_WAVE,
         target: PAGE_WAVE,
+    },
+    HomeItem {
+        label: "数学",
+        icon: ICON_MATH,
+        target: PAGE_MATH,
     },
     HomeItem {
         label: "关于设备",
@@ -317,7 +325,8 @@ static BOOL_BINDINGS: [BoolBinding; 3] = [
 ];
 
 static WAVE: Wave = Wave::new();
-static CUSTOM_PAGES: [CustomPage; 1] = [&WAVE];
+static MATH: MathPage = MathPage::new();
+static CUSTOM_PAGES: [CustomPage; 2] = [&WAVE, &MATH];
 
 static CONFIRM_DESCS: [ConfirmDesc; 1] = [ConfirmDesc {
     text: "恢复默认设置？\n包含屏幕亮度",
@@ -325,7 +334,7 @@ static CONFIRM_DESCS: [ConfirmDesc; 1] = [ConfirmDesc {
     cancelled_event: EVENT_RESET_CANCELLED,
 }];
 
-static ROUTES: [PageRoute; 6] = [
+static ROUTES: [PageRoute; 7] = [
     PageRoute {
         kind: PageType::Home,
         index: 0,
@@ -348,6 +357,10 @@ static ROUTES: [PageRoute; 6] = [
     },
     PageRoute {
         kind: PageType::Menu,
+        index: 1,
+    },
+    PageRoute {
+        kind: PageType::Custom,
         index: 1,
     },
 ];
@@ -543,6 +556,108 @@ impl CustomPageHandler for Wave {
             state.progress,
             100,
         );
+        frame.reset_clip();
+    }
+}
+
+/// 正弦页的帧间状态。
+#[derive(Clone, Copy)]
+struct MathState {
+    /// 曲线左移的像素数，0–31。
+    shift: u16,
+    /// 进入页面的时间戳，毫秒。
+    entered_at: u32,
+}
+
+impl MathState {
+    /// 初始状态。
+    const fn new() -> Self {
+        Self {
+            shift: 0,
+            entered_at: 0,
+        }
+    }
+}
+
+/// 正弦页的自绘页实现：带坐标轴的曲线，随时间向左移动。
+pub struct MathPage {
+    /// 帧间状态；回调只拿 `&self`，所以放在共享单元里。
+    state: Shared<MathState>,
+}
+
+impl MathPage {
+    /// 初始状态。
+    pub const fn new() -> Self {
+        Self {
+            state: Shared::new(MathState::new()),
+        }
+    }
+}
+
+impl Default for MathPage {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// 一个周期的正弦值，按 16 归一化，`-16..=16`。
+const SINE: [i16; 32] = [
+    0, 3, 6, 9, 11, 13, 14, 15, 16, 15, 14, 13, 11, 9, 6, 3, 0, -3, -6, -9, -11, -13, -14, -15,
+    -16, -15, -14, -13, -11, -9, -6, -3,
+];
+
+impl CustomPageHandler for MathPage {
+    fn on_enter(&self, _ui: &mut Runtime, _page: PageId) {
+        let mut state = MathState::new();
+        state.entered_at = APP_NOW.get();
+        self.state.set(state);
+    }
+
+    fn on_input(&self, ui: &mut Runtime, _page: PageId, event: InputEvent) {
+        if event.action == InputAction::Ok {
+            ui.custom_request_close();
+        }
+    }
+
+    fn on_tick(&self, _ui: &mut Runtime, _page: PageId, now: u32) -> bool {
+        let mut state = self.state.get();
+        let shift = (now.wrapping_sub(state.entered_at) / 40 % 32) as u16;
+        if shift == state.shift {
+            return false;
+        }
+        state.shift = shift;
+        self.state.set(state);
+        true
+    }
+
+    fn on_draw(
+        &self,
+        ui: &mut Runtime,
+        _page: PageId,
+        x_offset: i16,
+        clip_x: i16,
+        clip_width: u16,
+    ) {
+        let state = self.state.get();
+        let frame: &mut Frame<'_> = ui.frame_mut();
+        let (width, height) = (frame.width(), frame.height());
+        frame.set_clip(clip_x, 0, clip_width, height as u16);
+        let mid = height / 2;
+        let axis_x = 12 + x_offset;
+        frame.draw_hline(x_offset, mid, width as u16);
+        frame.draw_vline(axis_x, 0, height as u16);
+        frame.draw_text(2 + x_offset, 1, "sin");
+        let amplitude = mid - 4;
+        let origin = axis_x - x_offset;
+        let mut previous_y = mid;
+        for x in origin..width {
+            let index = ((x - origin + state.shift as i16) & 31) as usize;
+            let y = mid - SINE[index] * amplitude / 16;
+            if x > origin {
+                frame.draw_line(x - 1 + x_offset, previous_y, x + x_offset, y);
+            }
+            previous_y = y;
+        }
         frame.reset_clip();
     }
 }
