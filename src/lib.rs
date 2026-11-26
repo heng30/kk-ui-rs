@@ -58,3 +58,83 @@ macro_rules! event_ids {
         $crate::event_ids!(@step $next + 1u16; $($(#[$rest_attr])* $rest),*);
     };
 }
+
+/// 批量声明 [`Shared`] 静态单元，写法是 `名字: 类型 = 初值`。
+///
+/// 只能写在模块作用域：生成的是 `pub static`。
+///
+/// ```ignore
+/// kk_ui::shared! {
+///     BRIGHTNESS: i32 = 80,
+///     DEMO_SWITCH: bool = true,
+/// }
+/// ```
+#[macro_export]
+macro_rules! shared {
+    ($($(#[$attr:meta])* $name:ident : $ty:ty = $value:expr),* $(,)?) => {
+        $(
+            $(#[$attr])*
+            pub static $name: $crate::Shared<$ty> = $crate::Shared::new($value);
+        )*
+    };
+}
+
+/// 批量声明 [`Text`] 静态文案，写法是 `名字 = "字面量"`。
+///
+/// ```ignore
+/// kk_ui::texts! {
+///     UPTIME = "0s",
+///     DEVICE_INFO = "KK_UI",
+/// }
+/// ```
+#[macro_export]
+macro_rules! texts {
+    ($($(#[$attr:meta])* $name:ident = $text:literal),* $(,)?) => {
+        $(
+            $(#[$attr])*
+            pub static $name: $crate::Text = $crate::Text::literal($text);
+        )*
+    };
+}
+
+/// 批量声明菜单条目状态表，写法是 `名字 = [初值, ...]`，每字节压 4 个 2 bit 状态。
+///
+/// 只能写在模块作用域：生成的是定长 `pub static` 数组。`Shared` 带内部可变性，
+/// 不能靠借用临时切片来声明，所以长度由宏自己数出来。
+///
+/// ```ignore
+/// kk_ui::menu_states! {
+///     SETTINGS_STATES = [0, 0],
+/// }
+/// ```
+#[macro_export]
+macro_rules! menu_states {
+    ($($(#[$attr:meta])* $name:ident = [$($value:expr),* $(,)?]),* $(,)?) => {
+        $(
+            $(#[$attr])*
+            pub static $name: [$crate::Shared<u8>; $crate::menu_states!(@len $($value),*)] =
+                [$($crate::Shared::new($value)),*];
+        )*
+    };
+    (@len) => { 0usize };
+    (@len $head:expr $(, $tail:expr)*) => { 1usize + $crate::menu_states!(@len $($tail),*) };
+}
+
+/// 批量声明图标静态表，写法是 `名字 = "资源路径"`。
+///
+/// `include_bytes!` 的路径相对**调用该宏的文件**解析。
+///
+/// ```ignore
+/// kk_ui::icons! {
+///     ICON_SETTINGS = "assets/icon0.bin",
+/// }
+/// ```
+#[macro_export]
+macro_rules! icons {
+    ($($(#[$attr:meta])* $name:ident = $path:literal),* $(,)?) => {
+        $(
+            $(#[$attr])*
+            pub static $name: &[u8] = include_bytes!($path);
+        )*
+    };
+}
