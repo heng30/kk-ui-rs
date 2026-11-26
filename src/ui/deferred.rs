@@ -4,7 +4,8 @@
 
 use super::{Runtime, Status};
 use crate::model::{
-    BitsBinding, BoolBinding, ChoiceBinding, ConfirmDesc, EVENT_NONE, EventId, IntBinding, PageType,
+    BitsBinding, BoolBinding, ChoiceBinding, ConfirmDesc, EVENT_NONE, EventId, IntBinding,
+    LineInputBinding, PageType,
 };
 use crate::widgets::dialog;
 use crate::widgets::dialog::Row;
@@ -26,6 +27,8 @@ pub(crate) enum DeferredType {
     Choice,
     /// 打开位掩码弹窗。
     Bits,
+    /// 打开文本编辑器。
+    LineInput,
     /// 打开确认框。
     Confirm,
     /// 打开消息框。
@@ -154,6 +157,27 @@ impl<'a> Runtime<'a> {
         }
         let now = self.last_update;
         dialog::open_bits(self, binding, now)
+    }
+
+    /// 打开文本编辑器。
+    pub fn open_line_input(&mut self, binding: &'static LineInputBinding) -> Status {
+        if !self.initialized {
+            return Status::NotInitialized;
+        }
+        if dialog::dialog_active(self) {
+            return Status::Busy;
+        }
+        if self.in_callback {
+            return self.defer(
+                DeferredType::LineInput,
+                Some(Row::LineInput(binding)),
+                "",
+                EVENT_NONE,
+                0,
+            );
+        }
+        let now = self.last_update;
+        dialog::open_line_input(self, binding, now)
     }
 
     /// 打开确认框。
@@ -308,6 +332,11 @@ impl<'a> Runtime<'a> {
             DeferredType::Bits => {
                 if let Some(Row::Bits(binding)) = request.row {
                     dialog::open_bits(self, binding, now);
+                }
+            }
+            DeferredType::LineInput => {
+                if let Some(Row::LineInput(binding)) = request.row {
+                    dialog::open_line_input(self, binding, now);
                 }
             }
             DeferredType::Message => {

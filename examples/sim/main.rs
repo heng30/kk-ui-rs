@@ -7,8 +7,9 @@
 //! make font       # 只生成字库
 //! make snapshot   # 无头截图，SNAPSHOT=/tmp/sim.png STEPS=40
 //!
-//! 无头模式跑的是自动演示，它会自己走遍每个页面：`--steps 460` 左右正好截到
-//! 「取值控件」页（分段单选行、位掩码行、枚举选择行与一条放不下的长标签）。
+//! 无头模式跑的是自动演示，它会自己走遍每个页面，`--steps` 越大截到越靠后的页面：
+//! 约 540 拍是设置页的「设备名称」输入框，560 拍是「取值控件」页的通道弹窗。
+//! 拍数会随示例与 autoplay 节奏漂移，按 40 拍一步往上试即可。
 //! ```
 //!
 //! 界面逻辑全在 `app.rs`（KK_UI 标准 Demo 的副本，图标在 `assets/`）；这里只把字库
@@ -110,17 +111,20 @@ fn headless(ui: &mut KkUi<'_>, steps: u32, path: &Path) -> Result<(), Box<dyn Er
     );
     now += TICK_MS;
     for _ in 0..steps {
-        let keys = autoplay.next_key(ui);
+        let (keys, encoder) = autoplay.next_key(ui);
         let until = now + KEY_HOLD_MS;
+        let mut encoder = encoder;
         for _ in 0..AUTOPLAY_INTERVAL_MS / TICK_MS {
             let held = if keys != 0 && now < until { keys } else { 0 };
             ui.update(
                 now,
                 Input {
                     keys: held,
-                    encoder_delta: 0,
+                    encoder_delta: encoder,
                 },
             );
+            // 编码器增量是一次性事件，只在这一拍送出去。
+            encoder = 0;
             app::update(ui, now);
             app::process_events(ui);
             now += TICK_MS;

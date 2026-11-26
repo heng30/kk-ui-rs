@@ -94,6 +94,7 @@ static APP: App = App {
     int_bindings: &INT_BINDINGS,
     bool_bindings: &BOOL_BINDINGS,
     confirm_descs: &CONFIRMS,
+    line_inputs: &[],
     texts: Texts {
         return_text: "Back",
         cancel_text: "Cancel",

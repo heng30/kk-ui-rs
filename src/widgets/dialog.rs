@@ -1,13 +1,15 @@
 //! 弹窗与 Toast 的公共骨架：会话状态、开合动画、焦点补间与输入/绘制分发。
 //!
-//! 一种弹窗一个文件：`int_editor`、`bool_editor`、`confirm`、`message`；贴底提示条在
-//! `toast`，共用的文本绘制与整数格式化在 `text`。这里只保留与弹窗类型无关的部分。
+//! 一种弹窗一个文件：`int_editor`、`bool_editor`、`choice_editor`、`bits_editor`、
+//! `line_input`、`confirm`、`message`；贴底提示条在 `toast`，共用的文本绘制与整数格式化在
+//! `widgets::utils`。这里只保留与弹窗类型无关的部分。
 
 mod bits_editor;
 mod bool_editor;
 mod choice_editor;
 mod confirm;
 mod int_editor;
+mod line_input;
 mod message;
 mod state;
 mod toast;
@@ -25,14 +27,24 @@ pub(crate) use bool_editor::open as open_bool;
 pub(crate) use choice_editor::open as open_choice;
 pub(crate) use confirm::open as open_confirm;
 pub(crate) use int_editor::open as open_int;
+pub(crate) use line_input::open as open_line_input;
 pub(crate) use message::open as open_message;
 pub(crate) use state::{DialogFocus, Overlay, OverlayType, Row, Toast};
 pub(crate) use toast::draw as draw_toast;
 pub(crate) use toast::open as toast_open;
 
+/// 弹窗最终宽度：文本编辑器要整屏，其余沿用 128 px 画布上的 122。
+fn dialog_width(rt: &Runtime) -> i16 {
+    if rt.overlay.kind == OverlayType::LineInput {
+        rt.frame.width() - 2
+    } else {
+        122
+    }
+}
+
 /// 弹窗内容相对画布左侧的偏移：128 px 画布上为 3，与 C 版一致。
 fn dialog_left(rt: &Runtime) -> i16 {
-    (rt.frame.width() - 122) / 2
+    (rt.frame.width() - dialog_width(rt)) / 2
 }
 
 /// 位掩码弹窗最多同时显示几行：屏越矮行越少，至少一行。
@@ -48,12 +60,12 @@ fn bits_visible(rt: &Runtime) -> i16 {
     }
 }
 
-/// 弹窗外框的最终高度：位列表按可见行数长高，其它弹窗沿用 64 行基准的 61。
+/// 弹窗外框的最终高度：位列表按可见行数长高，文本编辑器占满整屏，其它弹窗沿用 64 行基准的 61。
 fn frame_height(rt: &Runtime) -> i16 {
-    if rt.overlay.kind == OverlayType::Bits {
-        44 + bits_visible(rt) * 16
-    } else {
-        61
+    match rt.overlay.kind {
+        OverlayType::Bits => 44 + bits_visible(rt) * 16,
+        OverlayType::LineInput => rt.frame.height() - 2,
+        _ => 61,
     }
 }
 
@@ -305,6 +317,7 @@ pub(crate) fn input(rt: &mut Runtime, event: InputEvent, now: u32) {
     match rt.overlay.kind {
         OverlayType::Message => message::input(rt, event, now),
         OverlayType::Confirm => confirm::input(rt, event, now),
+        OverlayType::LineInput => line_input::input(rt, event, now),
         OverlayType::Int | OverlayType::Bool | OverlayType::Choice | OverlayType::Bits => {
             editor_input(rt, event, now)
         }
@@ -431,7 +444,8 @@ pub(crate) fn draw(rt: &mut Runtime<'_>) {
     let target_y = dy as i32 + 1;
     let x = (dx as i32 + 3 * p / one) as i16;
     let y = (rt.overlay.origin_y as i32 + (target_y - rt.overlay.origin_y as i32) * p / one) as i16;
-    let width = (118 - 2 * p / one).min(screen_width as i32 - 2 * dx as i32 + 1) as i16;
+    let width = (dialog_width(rt) as i32 - 4 - 2 * p / one)
+        .min(screen_width as i32 - 2 * dx as i32 + 1) as i16;
     let height = (16 + (frame_height(rt) as i32 - 16) * p / one) as i16;
     {
         let frame = &mut rt.frame;
@@ -460,17 +474,22 @@ pub(crate) fn draw(rt: &mut Runtime<'_>) {
         OverlayType::Choice => choice_editor::draw(rt, &layout),
         OverlayType::Bits => bits_editor::draw(rt, &layout),
         OverlayType::Message => message::draw(rt, &layout),
+        OverlayType::LineInput => line_input::draw(rt, &layout),
         OverlayType::None => {}
     }
-    let (focus_x, focus_y, focus_w, focus_h) = current_focus(rt, rt.last_update);
-    rt.frame.set_draw_mode(DrawMode::Xor);
-    rt.frame.draw_rbox(
-        round_q8(focus_x),
-        round_q8(focus_y),
-        round_q8(focus_w) as u16,
-        round_q8(focus_h) as u16,
-        3,
-    );
-    rt.frame.set_draw_mode(DrawMode::Set);
+
+    // 文本编辑器用键上的光标框，不再画弹窗的焦点框。
+    if rt.overlay.kind != OverlayType::LineInput {
+        let (focus_x, focus_y, focus_w, focus_h) = current_focus(rt, rt.last_update);
+        rt.frame.set_draw_mode(DrawMode::Xor);
+        rt.frame.draw_rbox(
+            round_q8(focus_x),
+            round_q8(focus_y),
+            round_q8(focus_w) as u16,
+            round_q8(focus_h) as u16,
+            3,
+        );
+        rt.frame.set_draw_mode(DrawMode::Set);
+    }
     rt.frame.reset_clip();
 }

@@ -80,6 +80,7 @@ static APP: App = App {
     int_bindings: &[],
     bool_bindings: &[],
     confirm_descs: &[],
+    line_inputs: &[],
     texts: Texts {
         return_text: "Back",
         cancel_text: "Cancel",

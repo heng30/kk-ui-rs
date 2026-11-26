@@ -7,6 +7,9 @@ use crate::model::{
 use crate::widgets::dialog;
 use crate::widgets::pages;
 
+/// 需要消抖的按键数，下标对应键位。
+const KEY_COUNT: usize = 3;
+
 /// 单个按键的消抖与重复状态。
 #[derive(Clone, Copy, Default)]
 pub(super) struct KeyState {
@@ -43,7 +46,7 @@ impl KkUi<'_> {
         let mut repeat = 0u8;
         let keys = input.keys & (KEY_UP | KEY_DOWN | KEY_OK);
         if !self.rt.keys_initialized {
-            for index in 0..3 {
+            for index in 0..KEY_COUNT {
                 let down = keys & (1 << index) != 0;
                 let key = &mut self.rt.keys[index];
                 key.changed_at = now;
@@ -55,7 +58,7 @@ impl KkUi<'_> {
             }
             self.rt.keys_initialized = true;
         } else {
-            for index in 0..3 {
+            for index in 0..KEY_COUNT {
                 let key = &mut self.rt.keys[index];
                 let down = keys & (1 << index) != 0;
                 if down != key.candidate {

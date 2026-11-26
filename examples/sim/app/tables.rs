@@ -4,7 +4,8 @@
 
 use kk_ui::{
     App, BitsBinding, BoolBinding, ChipBinding, ChoiceBinding, ConfirmDesc, HomeItem, HomePage,
-    InfoPage, InfoRow, IntBinding, MenuAction, MenuItem, MenuPage, PageRoute, Texts,
+    InfoPage, InfoRow, IntBinding, LineInput, LineInputBinding, MenuAction, MenuItem, MenuPage,
+    PageRoute, Texts,
 };
 
 use super::math::MathPage;
@@ -39,6 +40,8 @@ kk_ui::event_ids! {
     EVENT_CHANNELS_CHANGED,
     /// 事件：枚举选择改变。
     EVENT_REFRESH_CHANGED,
+    /// 事件：设备名称改变。
+    EVENT_DEVICE_NAME_CHANGED,
 }
 
 // 图标是 32×32 XBM，每个 128 字节。
@@ -199,6 +202,16 @@ pub(super) static CHOICE_REFRESH: ChoiceBinding = ChoiceBinding {
     changed_event: EVENT_REFRESH_CHANGED,
 };
 
+/// 设备名称，供单行输入框演示。
+pub(super) static DEVICE_NAME: LineInput = LineInput::literal("KK_UI");
+
+/// 文本绑定：设备名称。
+pub(super) static LINE_INPUT_DEVICE: LineInputBinding = LineInputBinding {
+    title: "设备名称",
+    value: &DEVICE_NAME,
+    changed_event: EVENT_DEVICE_NAME_CHANGED,
+};
+
 /// 确认框：恢复默认设置。
 pub(super) static CONFIRM_RESET: ConfirmDesc = ConfirmDesc {
     text: "恢复默认设置？\n包含屏幕亮度",
@@ -234,7 +247,7 @@ pub(super) static HOME_ITEMS: [HomeItem; 5] = [
     },
 ];
 
-pub(super) static SETTINGS_ITEMS: [MenuItem; 7] = [
+pub(super) static SETTINGS_ITEMS: [MenuItem; 8] = [
     MenuItem {
         label: "屏幕亮度",
         action: MenuAction::Int(&INT_BRIGHTNESS),
@@ -242,6 +255,10 @@ pub(super) static SETTINGS_ITEMS: [MenuItem; 7] = [
     MenuItem {
         label: "开关",
         action: MenuAction::Bool(&BOOL_SWITCH),
+    },
+    MenuItem {
+        label: "设备名称",
+        action: MenuAction::LineInput(&LINE_INPUT_DEVICE),
     },
     MenuItem {
         label: "取值控件",
@@ -374,6 +391,7 @@ pub(super) static INT_BINDINGS: [&IntBinding; 2] = [&INT_BRIGHTNESS, &INT_INTERV
 pub(super) static BOOL_BINDINGS: [&BoolBinding; 3] =
     [&BOOL_SWITCH, &BOOL_SHOW_ITEM, &BOOL_DISABLE_ITEM];
 pub(super) static CONFIRM_DESCS: [&ConfirmDesc; 1] = [&CONFIRM_RESET];
+pub(super) static LINE_INPUTS: [&LineInputBinding; 1] = [&LINE_INPUT_DEVICE];
 
 pub(super) static WAVE: Wave = Wave::new();
 pub(super) static MATH: MathPage = MathPage::new();
@@ -396,6 +414,7 @@ pub static APP: App = App {
     int_bindings: &INT_BINDINGS,
     bool_bindings: &BOOL_BINDINGS,
     confirm_descs: &CONFIRM_DESCS,
+    line_inputs: &LINE_INPUTS,
     texts: Texts {
         return_text: "返回",
         cancel_text: "取消",

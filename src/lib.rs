@@ -31,8 +31,8 @@ pub use gfx::{DrawMode, Frame};
 pub use model::{
     App, BitsBinding, BoolBinding, ChipBinding, ChoiceBinding, ConfirmDesc, CustomPage, EVENT_NONE,
     EventId, HomeItem, HomePage, InfoPage, InfoRow, Input, InputAction, InputEvent, InputSource,
-    IntBinding, ItemState, KEY_DOWN, KEY_OK, KEY_UP, MAX_BITS, MenuAction, MenuItem, MenuPage,
-    PageRoute, PageType, Shared, Text, Texts,
+    IntBinding, ItemState, KEY_DOWN, KEY_OK, KEY_UP, LINE_INPUT_LEN, LineInput, LineInputBinding,
+    MAX_BITS, MenuAction, MenuItem, MenuPage, PageRoute, PageType, Shared, Text, Texts,
 };
 pub use ui::{CustomPageHandler, ErrorInfo, KkUi, Runtime, Status};
 pub use widgets::{draw_focus, draw_progress_bar, draw_switch, utils::format_int};

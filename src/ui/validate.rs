@@ -49,6 +49,7 @@ impl Runtime<'_> {
                                 !binding.labels.is_empty()
                                     && (binding.value.get() as usize) < binding.labels.len()
                             }
+                            MenuAction::LineInput(_) => true,
                         };
                         if !valid {
                             return Err((Some(*route), index as u16));

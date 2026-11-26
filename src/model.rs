@@ -26,6 +26,9 @@ pub const KEY_OK: u8 = 1 << 2;
 /// 运行时文本缓冲的最大字节数，按 UTF-8 计；32 字节能放下 10 个汉字。
 pub const TEXT_LEN: usize = 32;
 
+/// 文本编辑器缓冲的最大字节数，按 UTF-8 计；64 字节能放下 21 个汉字。
+pub const LINE_INPUT_LEN: usize = 64;
+
 /// 单核裸机下的共享可变值：只在 UI 主循环与其回调里访问。
 pub struct Shared<T>(Cell<T>);
 
@@ -110,17 +113,117 @@ impl Text {
     }
 }
 
-/// 不超过 [`TEXT_LEN`] 且落在字符边界上的字节数。
-const fn fit(source: &[u8]) -> usize {
-    let mut len = if source.len() < TEXT_LEN {
+/// 不超过 `cap` 且落在字符边界上的字节数。
+const fn fit_in(source: &[u8], cap: usize) -> usize {
+    let mut len = if source.len() < cap {
         source.len()
     } else {
-        TEXT_LEN
+        cap
     };
     while len > 0 && len < source.len() && source[len] & 0xC0 == 0x80 {
         len -= 1;
     }
     len
+}
+
+/// 不超过 [`TEXT_LEN`] 且落在字符边界上的字节数。
+const fn fit(source: &[u8]) -> usize {
+    fit_in(source, TEXT_LEN)
+}
+
+/// 可编辑的共享文本，供 [`LineInputBinding`] 与文本编辑器使用。
+///
+/// 与 [`Text`] 的访问约定相同，区别是容量更大且带末尾插入、删除。
+pub struct LineInput {
+    /// 内容字节，未用部分补 0。
+    bytes: Cell<[u8; LINE_INPUT_LEN]>,
+    /// 有效字节数，按 UTF-8 计。
+    len: Cell<u8>,
+}
+
+// SAFETY: 与 [`Text`] 相同，只在单核 UI 主循环里顺序访问。
+unsafe impl Sync for LineInput {}
+
+impl Default for LineInput {
+    /// 空文本。
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl LineInput {
+    /// 空文本。
+    pub const fn new() -> Self {
+        Self {
+            bytes: Cell::new([0; LINE_INPUT_LEN]),
+            len: Cell::new(0),
+        }
+    }
+
+    /// 由字符串字面量构造；超出 [`LINE_INPUT_LEN`] 的部分按字符边界截断。
+    pub const fn literal(text: &str) -> Self {
+        let source = text.as_bytes();
+        let len = fit_in(source, LINE_INPUT_LEN);
+        let mut bytes = [0u8; LINE_INPUT_LEN];
+        let mut index = 0;
+        while index < len {
+            bytes[index] = source[index];
+            index += 1;
+        }
+        Self {
+            bytes: Cell::new(bytes),
+            len: Cell::new(len as u8),
+        }
+    }
+
+    /// 覆盖内容；超出 [`LINE_INPUT_LEN`] 的部分按字符边界截断。
+    pub fn set(&self, text: &str) {
+        let source = text.as_bytes();
+        let mut bytes = [0u8; LINE_INPUT_LEN];
+        let len = fit_in(source, LINE_INPUT_LEN);
+        bytes[..len].copy_from_slice(&source[..len]);
+        self.bytes.set(bytes);
+        self.len.set(len as u8);
+    }
+
+    /// 在栈上复制一份内容后交给闭包，返回值原样透传。
+    pub fn with<R>(&self, f: impl FnOnce(&str) -> R) -> R {
+        let bytes = self.bytes.get();
+        let len = self.len.get() as usize;
+        f(core::str::from_utf8(&bytes[..len]).unwrap_or(""))
+    }
+
+    /// 在末尾追加一个字符；放不下时整字丢弃，已存内容不受影响。
+    pub fn push(&self, c: char) {
+        let mut encoded = [0u8; 4];
+        let encoded = c.encode_utf8(&mut encoded).as_bytes();
+        let len = self.len.get() as usize;
+        if len + encoded.len() > LINE_INPUT_LEN {
+            return;
+        }
+        let mut bytes = self.bytes.get();
+        bytes[len..len + encoded.len()].copy_from_slice(encoded);
+        self.bytes.set(bytes);
+        self.len.set((len + encoded.len()) as u8);
+    }
+
+    /// 删除末尾一个完整字符；空文本无操作。
+    pub fn pop(&self) {
+        let len = self.len.get() as usize;
+        if len == 0 {
+            return;
+        }
+        let mut bytes = self.bytes.get();
+        let mut end = len - 1;
+        while end > 0 && bytes[end] & 0xC0 == 0x80 {
+            end -= 1;
+        }
+        for byte in &mut bytes[end..len] {
+            *byte = 0;
+        }
+        self.bytes.set(bytes);
+        self.len.set(end as u8);
+    }
 }
 
 /// 一次刷新传入的原始输入。
@@ -237,6 +340,8 @@ pub enum MenuAction {
     Bits(&'static BitsBinding),
     /// 枚举选择弹窗。
     Choice(&'static ChoiceBinding),
+    /// 文本编辑器。
+    LineInput(&'static LineInputBinding),
     /// 确认框。
     Confirm(&'static ConfirmDesc),
 }
@@ -342,6 +447,16 @@ pub struct BitsBinding {
     pub changed_event: EventId,
 }
 
+/// 文本绑定：菜单行右列显示当前文字，按 OK 打开文本编辑器改写。
+pub struct LineInputBinding {
+    /// 标题。
+    pub title: &'static str,
+    /// 绑定的文字。
+    pub value: &'static LineInput,
+    /// 提交后入队的事件。
+    pub changed_event: EventId,
+}
+
 /// 枚举选择绑定：值就是标签表里的下标。
 pub struct ChoiceBinding {
     /// 标题。
@@ -393,6 +508,8 @@ pub struct App {
     pub int_bindings: &'static [&'static IntBinding],
     /// 开关绑定清单；顺序无关，只在初始化时用于校验。
     pub bool_bindings: &'static [&'static BoolBinding],
+    /// 文本绑定清单；顺序无关，只在初始化时用于校验。
+    pub line_inputs: &'static [&'static LineInputBinding],
     /// 确认框清单；顺序无关，只在初始化时用于校验。
     pub confirm_descs: &'static [&'static ConfirmDesc],
     /// 文案。

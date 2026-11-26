@@ -2,7 +2,9 @@
 
 use kk_ui::{KEY_DOWN, KEY_OK, KkUi, PageRoute};
 
-use super::tables::{BITS_CHANNELS, HOME_ITEMS, ROUTE_COMPONENTS, ROUTE_CONTROLS, ROUTE_HOME};
+use super::tables::{
+    BITS_CHANNELS, HOME_ITEMS, LINE_INPUT_DEVICE, ROUTE_COMPONENTS, ROUTE_CONTROLS, ROUTE_HOME,
+};
 
 /// 自动演示记录「哪些行打开过」用的页面槽位数，按页面编号取模。
 const AUTOPLAY_PAGES: usize = 8;
@@ -19,6 +21,8 @@ pub struct Autoplay {
     opened: [u32; AUTOPLAY_PAGES],
     /// 位掩码弹窗里下一步按方向键还是确定。
     bits_move: bool,
+    /// 文本编辑器演示已经走到第几步。
+    line_input_step: u8,
 }
 
 impl Default for Autoplay {
@@ -34,37 +38,56 @@ impl Autoplay {
             target: 0,
             opened: [0; AUTOPLAY_PAGES],
             bits_move: true,
+            line_input_step: 0,
         }
     }
 
     /// 决定这一拍按哪个键。
-    pub fn next_key(&mut self, ui: &KkUi<'_>) -> u8 {
+    pub fn next_key(&mut self, ui: &KkUi<'_>) -> (u8, i16) {
         // 位掩码弹窗是一列方片，只按确定会把第 0 位来回翻、永远走不到按钮，
         // 所以在这里按「方向键走位、确定翻转」交替操作，走到末位后确定会提交。
         if ui.get_bits_editor_draft(&BITS_CHANNELS).is_some() {
             self.bits_move = !self.bits_move;
-            return if self.bits_move { KEY_DOWN } else { KEY_OK };
+            return (if self.bits_move { KEY_DOWN } else { KEY_OK }, 0);
+        }
+        // 文本编辑器不按确定收尾：确定只输入光标下的字符，得先打几个字再走到底行的
+        // 「OK」。行内移动太慢，这里用编码器一步滑到右端的换行按钮。
+        if !ui.dialog_open() {
+            self.line_input_step = 0;
+        }
+        if ui.line_input_open(&LINE_INPUT_DEVICE) {
+            let step = self.line_input_step;
+            self.line_input_step = step.wrapping_add(1);
+            return match step {
+                // 先在字母区打两个字，再滑到第 0 行右端的换行按钮。
+                0 | 1 => (KEY_OK, 0),
+                2 => (0, 10),
+                // 连续踩三下换行按钮下到功能行，退回一格踩确定提交。
+                3..=5 => (KEY_OK, 0),
+                6 => (0, -1),
+                _ => (KEY_OK, 0),
+            };
         }
         // 其它弹窗一律用「确定」收尾：整数/开关/枚举编辑器两下确定提交并关闭，
         // 确认框与消息框一下就关。
         if ui.dialog_open() {
-            return KEY_OK;
+            return (KEY_OK, 0);
         }
         let Some(page) = ui.current_page() else {
-            return KEY_OK;
+            return (KEY_OK, 0);
         };
         if core::ptr::eq(page, &ROUTE_HOME) {
             // 首页：先把选中项走到目标图标，再按「确定」进去；目标按顺序轮换。
             if ui.selected_index() == self.target {
                 self.target = (self.target + 1) % HOME_ITEMS.len() as u16;
-                return KEY_OK;
+                return (KEY_OK, 0);
             }
-            return KEY_DOWN;
+            return (KEY_DOWN, 0);
         }
         let items = menu_item_count(page);
         if items == 0 {
             // 信息页与自绘页都用「确定」返回。
-            return KEY_OK;
+            return (KEY_OK, 0);
         }
         // 菜单：每一行先按「确定」打开一次，打开过就往下走；走到最后一行（虚拟返回项）
         // 就清空标记并离开，下一轮进来又是逐个打开。
@@ -74,12 +97,12 @@ impl Autoplay {
             let bit = 1u32 << (selected & 31);
             if self.opened[slot] & bit == 0 {
                 self.opened[slot] |= bit;
-                return KEY_OK;
+                return (KEY_OK, 0);
             }
-            return KEY_DOWN;
+            return (KEY_DOWN, 0);
         }
         self.opened[slot] = 0;
-        KEY_OK
+        (KEY_OK, 0)
     }
 }
 

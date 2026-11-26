@@ -11,7 +11,8 @@ use super::{
 };
 use crate::gfx::Frame;
 use crate::model::{
-    App, BitsBinding, EVENT_NONE, EventId, IntBinding, ItemState, PageRoute, PageType,
+    App, BitsBinding, EVENT_NONE, EventId, IntBinding, ItemState, LineInputBinding, PageRoute,
+    PageType,
 };
 use crate::widgets::dialog::{Overlay, OverlayType, Row, Toast};
 use crate::widgets::pages;
@@ -245,6 +246,15 @@ impl<'a> Runtime<'a> {
             }
             _ => None,
         }
+    }
+
+    /// 文本编辑器是否正打开在给定绑定上。
+    pub fn line_input_open(&self, binding: &'static LineInputBinding) -> bool {
+        if !self.initialized || self.overlay.kind != OverlayType::LineInput || self.overlay.closing
+        {
+            return false;
+        }
+        matches!(self.overlay.row, Some(Row::LineInput(current)) if core::ptr::eq(current, binding))
     }
 
     /// 设置菜单条目状态。

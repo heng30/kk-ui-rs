@@ -21,7 +21,8 @@ mod validate;
 
 use crate::gfx::Frame;
 use crate::model::{
-    App, BitsBinding, BoolBinding, ConfirmDesc, EventId, Input, IntBinding, ItemState, PageRoute,
+    App, BitsBinding, BoolBinding, ConfirmDesc, EventId, Input, IntBinding, ItemState,
+    LineInputBinding, PageRoute,
 };
 use crate::widgets::{dialog, pages};
 
@@ -142,6 +143,11 @@ impl<'a> KkUi<'a> {
         self.rt.get_bits_editor_draft(binding)
     }
 
+    /// 文本编辑器是否正打开在给定绑定上。
+    pub fn line_input_open(&self, binding: &'static LineInputBinding) -> bool {
+        self.rt.line_input_open(binding)
+    }
+
     /// 显示工作是否已经静止。
     pub fn is_display_idle(&self) -> bool {
         self.rt.is_display_idle()
@@ -170,6 +176,11 @@ impl<'a> KkUi<'a> {
     /// 打开开关编辑器。
     pub fn open_bool_editor(&mut self, binding: &'static BoolBinding) -> Status {
         self.rt.open_bool_editor(binding)
+    }
+
+    /// 打开文本编辑器。
+    pub fn open_line_input(&mut self, binding: &'static LineInputBinding) -> Status {
+        self.rt.open_line_input(binding)
     }
 
     /// 打开确认框。

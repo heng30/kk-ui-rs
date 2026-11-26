@@ -297,6 +297,7 @@ fn menu_activate(rt: &mut Runtime, now: u32) {
         MenuAction::Chip(binding) => chip_cycle(rt, binding, index),
         MenuAction::Bits(binding) => dialog::open_bits(rt, binding, now),
         MenuAction::Choice(binding) => dialog::open_choice(rt, binding, now),
+        MenuAction::LineInput(binding) => dialog::open_line_input(rt, binding, now),
         MenuAction::Confirm(index) => dialog::open_confirm(rt, index, now),
         MenuAction::Event(event) => {
             if rt.queue_event(event) {
@@ -401,6 +402,14 @@ fn menu_value<'a>(rt: &Runtime, item: &MenuItem, buffer: &'a mut [u8; 20]) -> &'
             .get(binding.value.get() as usize)
             .copied()
             .unwrap_or(""),
+        MenuAction::LineInput(binding) => {
+            // 分两次读：一次取长度，一次拷字节，避开同时借用缓冲与文本。
+            let len = binding.value.with(|text| text.len().min(buffer.len()));
+            binding
+                .value
+                .with(|text| buffer[..len].copy_from_slice(&text.as_bytes()[..len]));
+            core::str::from_utf8(&buffer[..len]).unwrap_or("")
+        }
         _ => "",
     }
 }

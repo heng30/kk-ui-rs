@@ -4,6 +4,7 @@
 
 use crate::model::{
     BitsBinding, BoolBinding, ChoiceBinding, ConfirmDesc, EVENT_NONE, EventId, IntBinding,
+    LINE_INPUT_LEN, LineInputBinding,
 };
 use crate::ui::Q12_ONE;
 
@@ -20,6 +21,8 @@ pub(crate) enum OverlayType {
     Choice,
     /// 位掩码弹窗。
     Bits,
+    /// 文本编辑器。
+    LineInput,
     /// 确认框。
     Confirm,
     /// 消息框。
@@ -48,6 +51,8 @@ pub(crate) enum Row {
     Choice(&'static ChoiceBinding),
     /// 位掩码绑定。
     Bits(&'static BitsBinding),
+    /// 文本绑定。
+    LineInput(&'static LineInputBinding),
     /// 确认框描述。
     Confirm(&'static ConfirmDesc),
 }
@@ -97,6 +102,20 @@ pub(crate) struct Overlay {
     pub cursor: u8,
     /// 位掩码弹窗里第一个可见的位。
     pub top: u8,
+
+    /// 文本编辑缓冲。
+    pub buf: [u8; LINE_INPUT_LEN],
+    /// 缓冲内的有效字节数。
+    pub buf_len: u8,
+    /// 软键盘光标所在行。
+    pub kb_row: u8,
+    /// 软键盘光标在该行的第几格，0 与末格是换行按钮。
+    pub kb_col: u8,
+    /// 软键盘是否处于大写锁定。
+    pub caps: bool,
+    /// 软键盘是否处于数字符号层。
+    pub symbols: bool,
+
     /// 是否正在播关闭动画。
     pub closing: bool,
     /// 焦点框是否正在补间。
@@ -129,6 +148,12 @@ impl Overlay {
         editing: false,
         cursor: 0,
         top: 0,
+        buf: [0; LINE_INPUT_LEN],
+        buf_len: 0,
+        kb_row: 0,
+        kb_col: 0,
+        caps: false,
+        symbols: false,
         closing: false,
         focus_moving: false,
         value_moving: false,
