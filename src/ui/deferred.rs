@@ -3,8 +3,9 @@
 //! 公开入口在自绘页回调期间不能直接开弹窗，只能登记请求，等回调退出后统一执行。
 
 use super::{Runtime, Status};
-use crate::model::{EVENT_NONE, EventId, PageType};
+use crate::model::{BoolBinding, ConfirmDesc, EVENT_NONE, EventId, IntBinding, PageType};
 use crate::widgets::dialog;
+use crate::widgets::dialog::Row;
 
 /// 延迟请求类型。
 #[derive(Clone, Copy, PartialEq, Eq)]
@@ -32,8 +33,8 @@ pub(crate) enum DeferredType {
 pub(crate) struct Deferred {
     /// 请求类型。
     pub kind: DeferredType,
-    /// 绑定表或确认框表的下标。
-    pub reference: u16,
+    /// 编辑器或确认框操作的表项；其它请求为 `None`。
+    pub row: Option<Row>,
     /// 消息框或结束时上报的事件。
     pub event: EventId,
     /// 消息框或 Toast 的文本。
@@ -47,7 +48,7 @@ impl<'a> Runtime<'a> {
     fn defer(
         &mut self,
         kind: DeferredType,
-        reference: u16,
+        row: Option<Row>,
         text: &'static str,
         event: EventId,
         duration: u32,
@@ -57,7 +58,7 @@ impl<'a> Runtime<'a> {
         }
         self.deferred = Deferred {
             kind,
-            reference,
+            row,
             event,
             text,
             duration,
@@ -66,57 +67,66 @@ impl<'a> Runtime<'a> {
     }
 
     /// 打开整数编辑器。
-    pub fn open_int_editor(&mut self, binding_index: u16) -> Status {
+    pub fn open_int_editor(&mut self, binding: &'static IntBinding) -> Status {
         if !self.initialized {
             return Status::NotInitialized;
-        }
-        if binding_index as usize >= self.app.int_bindings.len() {
-            return Status::InvalidArgument;
         }
         if dialog::dialog_active(self) {
             return Status::Busy;
         }
         if self.in_callback {
-            return self.defer(DeferredType::Int, binding_index, "", EVENT_NONE, 0);
+            return self.defer(
+                DeferredType::Int,
+                Some(Row::Int(binding)),
+                "",
+                EVENT_NONE,
+                0,
+            );
         }
         let now = self.last_update;
-        dialog::open_int(self, binding_index, now)
+        dialog::open_int(self, binding, now)
     }
 
     /// 打开开关编辑器。
-    pub fn open_bool_editor(&mut self, binding_index: u16) -> Status {
+    pub fn open_bool_editor(&mut self, binding: &'static BoolBinding) -> Status {
         if !self.initialized {
             return Status::NotInitialized;
-        }
-        if binding_index as usize >= self.app.bool_bindings.len() {
-            return Status::InvalidArgument;
         }
         if dialog::dialog_active(self) {
             return Status::Busy;
         }
         if self.in_callback {
-            return self.defer(DeferredType::Bool, binding_index, "", EVENT_NONE, 0);
+            return self.defer(
+                DeferredType::Bool,
+                Some(Row::Bool(binding)),
+                "",
+                EVENT_NONE,
+                0,
+            );
         }
         let now = self.last_update;
-        dialog::open_bool(self, binding_index, now)
+        dialog::open_bool(self, binding, now)
     }
 
     /// 打开确认框。
-    pub fn open_confirm(&mut self, confirm_index: u16) -> Status {
+    pub fn open_confirm(&mut self, desc: &'static ConfirmDesc) -> Status {
         if !self.initialized {
             return Status::NotInitialized;
-        }
-        if confirm_index as usize >= self.app.confirm_descs.len() {
-            return Status::InvalidArgument;
         }
         if dialog::dialog_active(self) {
             return Status::Busy;
         }
         if self.in_callback {
-            return self.defer(DeferredType::Confirm, confirm_index, "", EVENT_NONE, 0);
+            return self.defer(
+                DeferredType::Confirm,
+                Some(Row::Confirm(desc)),
+                "",
+                EVENT_NONE,
+                0,
+            );
         }
         let now = self.last_update;
-        dialog::open_confirm(self, confirm_index, now)
+        dialog::open_confirm(self, desc, now)
     }
 
     /// 打开消息框。
@@ -128,7 +138,7 @@ impl<'a> Runtime<'a> {
             return Status::Busy;
         }
         if self.in_callback {
-            return self.defer(DeferredType::Message, 0, text, event, 0);
+            return self.defer(DeferredType::Message, None, text, event, 0);
         }
         let now = self.last_update;
         dialog::open_message(self, text, event, now)
@@ -143,7 +153,7 @@ impl<'a> Runtime<'a> {
             return Status::Busy;
         }
         if self.in_callback {
-            return self.defer(DeferredType::Toast, 0, text, EVENT_NONE, duration_ms);
+            return self.defer(DeferredType::Toast, None, text, EVENT_NONE, duration_ms);
         }
         let now = self.last_update;
         dialog::toast_open(self, text, duration_ms, now)
@@ -164,7 +174,7 @@ impl<'a> Runtime<'a> {
             return Status::NotAllowed;
         }
         if self.in_callback {
-            return self.defer(DeferredType::Close, 0, "", EVENT_NONE, 0);
+            return self.defer(DeferredType::Close, None, "", EVENT_NONE, 0);
         }
         let now = self.last_update;
         self.navigate_back(now)
@@ -188,7 +198,7 @@ impl<'a> Runtime<'a> {
             return Status::NotAllowed;
         }
         if self.in_callback {
-            return self.defer(DeferredType::Finish, 0, "", event, 0);
+            return self.defer(DeferredType::Finish, None, "", event, 0);
         }
         if !self.queue_event(event) {
             return Status::QueueFull;
@@ -228,13 +238,19 @@ impl<'a> Runtime<'a> {
                 }
             }
             DeferredType::Int => {
-                dialog::open_int(self, request.reference, now);
+                if let Some(Row::Int(binding)) = request.row {
+                    dialog::open_int(self, binding, now);
+                }
             }
             DeferredType::Bool => {
-                dialog::open_bool(self, request.reference, now);
+                if let Some(Row::Bool(binding)) = request.row {
+                    dialog::open_bool(self, binding, now);
+                }
             }
             DeferredType::Confirm => {
-                dialog::open_confirm(self, request.reference, now);
+                if let Some(Row::Confirm(desc)) = request.row {
+                    dialog::open_confirm(self, desc, now);
+                }
             }
             DeferredType::Message => {
                 dialog::open_message(self, request.text, request.event, now);

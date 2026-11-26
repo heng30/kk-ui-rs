@@ -35,3 +35,26 @@ pub use model::{
 };
 pub use ui::{CustomPageHandler, ErrorInfo, KkUi, Runtime, Status};
 pub use widgets::{draw_focus, draw_progress_bar, draw_switch, utils::format_int};
+
+/// 按声明顺序为事件生成从 1 开始的编号常量。
+///
+/// 只能写在模块作用域：生成的是 `pub const`。
+///
+/// ```ignore
+/// kk_ui::event_ids! {
+///     /// 事件：亮度改变。
+///     EVENT_BRIGHTNESS_CHANGED,
+///     EVENT_SWITCH_CHANGED,
+/// }
+/// ```
+#[macro_export]
+macro_rules! event_ids {
+    ($($(#[$attr:meta])* $name:ident),* $(,)?) => {
+        $crate::event_ids!(@step 0u16; $($(#[$attr])* $name),*);
+    };
+    (@step $next:expr;) => {};
+    (@step $next:expr; $(#[$attr:meta])* $name:ident $(, $(#[$rest_attr:meta])* $rest:ident)* $(,)?) => {
+        $(#[$attr])* pub const $name: $crate::EventId = $next + 1;
+        $crate::event_ids!(@step $next + 1u16; $($(#[$rest_attr])* $rest),*);
+    };
+}

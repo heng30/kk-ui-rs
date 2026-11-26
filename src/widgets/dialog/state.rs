@@ -2,7 +2,7 @@
 //!
 //! 这些状态由 [`crate::ui::Runtime`] 持有，读写都在 `widgets::dialog` 里。
 
-use crate::model::{EVENT_NONE, EventId};
+use crate::model::{BoolBinding, ConfirmDesc, EVENT_NONE, EventId, IntBinding};
 use crate::ui::Q12_ONE;
 
 /// 覆盖层类型。
@@ -31,13 +31,24 @@ pub(crate) enum DialogFocus {
     Cancel,
 }
 
+/// 弹窗操作的表项句柄。
+#[derive(Clone, Copy)]
+pub(crate) enum Row {
+    /// 整数编辑器绑定。
+    Int(&'static IntBinding),
+    /// 开关编辑器绑定。
+    Bool(&'static BoolBinding),
+    /// 确认框描述。
+    Confirm(&'static ConfirmDesc),
+}
+
 /// 覆盖层状态。
 #[derive(Clone, Copy)]
 pub(crate) struct Overlay {
     /// 当前覆盖层类型。
     pub kind: OverlayType,
-    /// 绑定表或确认框表的下标。
-    pub reference: u16,
+    /// 编辑器或确认框操作的表项；消息框为 `None`。
+    pub row: Option<Row>,
     /// 正文；确认框与消息框使用。
     pub text: &'static str,
     /// 关闭时要入队的事件。
@@ -84,7 +95,7 @@ impl Overlay {
     /// 没有任何覆盖层时的初始状态。
     pub(crate) const EMPTY: Self = Self {
         kind: OverlayType::None,
-        reference: 0,
+        row: None,
         text: "",
         event: EVENT_NONE,
         draft: 0,

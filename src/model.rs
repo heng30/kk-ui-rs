@@ -227,12 +227,12 @@ pub enum MenuAction {
     Page(&'static PageRoute),
     /// 触发事件。
     Event(EventId),
-    /// 整数编辑器，参数是绑定下标。
-    Int(u16),
-    /// 开关编辑器，参数是绑定下标。
-    Bool(u16),
-    /// 确认框，参数是描述表下标。
-    Confirm(u16),
+    /// 整数编辑器。
+    Int(&'static IntBinding),
+    /// 开关编辑器。
+    Bool(&'static BoolBinding),
+    /// 确认框。
+    Confirm(&'static ConfirmDesc),
 }
 
 /// 菜单项。
@@ -342,12 +342,12 @@ pub struct App {
     pub root_page: &'static PageRoute,
     /// 页面清单；顺序无关，只在初始化时用于校验。
     pub routes: &'static [&'static PageRoute],
-    /// 整数绑定表。
-    pub int_bindings: &'static [IntBinding],
-    /// 开关绑定表。
-    pub bool_bindings: &'static [BoolBinding],
-    /// 确认框表。
-    pub confirm_descs: &'static [ConfirmDesc],
+    /// 整数绑定清单；顺序无关，只在初始化时用于校验。
+    pub int_bindings: &'static [&'static IntBinding],
+    /// 开关绑定清单；顺序无关，只在初始化时用于校验。
+    pub bool_bindings: &'static [&'static BoolBinding],
+    /// 确认框清单；顺序无关，只在初始化时用于校验。
+    pub confirm_descs: &'static [&'static ConfirmDesc],
     /// 文案。
     pub texts: Texts,
 }

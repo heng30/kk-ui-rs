@@ -8,11 +8,20 @@ use kk_ui::{
     KkUi, MenuAction, MenuItem, MenuPage, PageRoute, Shared, Texts, set_font,
 };
 
-/// 编辑器/确认框提交后入队的事件号。
-const EVENT_INT: u16 = 1;
-const EVENT_BOOL: u16 = 2;
-const EVENT_CONFIRMED: u16 = 3;
-const EVENT_CANCELLED: u16 = 4;
+kk_ui::event_ids! {
+    EVENT_INT,
+    EVENT_BOOL,
+    EVENT_CONFIRMED,
+    EVENT_CANCELLED,
+}
+
+#[test]
+fn event_ids_are_sequential() {
+    assert_eq!(
+        (EVENT_INT, EVENT_BOOL, EVENT_CONFIRMED, EVENT_CANCELLED),
+        (1, 2, 3, 4)
+    );
+}
 /// 画布尺寸。
 const WIDTH: i16 = 128;
 const HEIGHT: i16 = 64;
@@ -36,15 +45,15 @@ static HOME_ITEMS: [kk_ui::HomeItem; 1] = [kk_ui::HomeItem {
 static MENU_ITEMS: [MenuItem; 3] = [
     MenuItem {
         label: "Level",
-        action: MenuAction::Int(0),
+        action: MenuAction::Int(&INT_LEVEL),
     },
     MenuItem {
         label: "Switch",
-        action: MenuAction::Bool(0),
+        action: MenuAction::Bool(&BOOL_SWITCH),
     },
     MenuItem {
         label: "Reset",
-        action: MenuAction::Confirm(0),
+        action: MenuAction::Confirm(&CONFIRM_RESET),
     },
 ];
 
@@ -56,7 +65,7 @@ static ROUTE_MENU: PageRoute = PageRoute::Menu(&MenuPage {
     states: None,
 });
 static ROUTES: [&PageRoute; 2] = [&ROUTE_HOME, &ROUTE_MENU];
-static INT_BINDINGS: [IntBinding; 1] = [IntBinding {
+static INT_LEVEL: IntBinding = IntBinding {
     title: "Level",
     value: &INT_VALUE,
     minimum: 0,
@@ -64,17 +73,20 @@ static INT_BINDINGS: [IntBinding; 1] = [IntBinding {
     step: 1,
     unit: "",
     changed_event: EVENT_INT,
-}];
-static BOOL_BINDINGS: [BoolBinding; 1] = [BoolBinding {
+};
+static BOOL_SWITCH: BoolBinding = BoolBinding {
     title: "Switch",
     value: &BOOL_VALUE,
     changed_event: EVENT_BOOL,
-}];
-static CONFIRMS: [ConfirmDesc; 1] = [ConfirmDesc {
+};
+static CONFIRM_RESET: ConfirmDesc = ConfirmDesc {
     text: "Reset?",
     confirmed_event: EVENT_CONFIRMED,
     cancelled_event: EVENT_CANCELLED,
-}];
+};
+static INT_BINDINGS: [&IntBinding; 1] = [&INT_LEVEL];
+static BOOL_BINDINGS: [&BoolBinding; 1] = [&BOOL_SWITCH];
+static CONFIRMS: [&ConfirmDesc; 1] = [&CONFIRM_RESET];
 
 static APP: App = App {
     root_page: &ROUTE_HOME,
@@ -140,12 +152,16 @@ fn int_editor_commits_after_ending_edit() {
     let mut panel = Panel::new();
     panel.press(KEY_OK); // 首页 → 菜单
     panel.press(KEY_OK); // 打开整数编辑器
-    assert_eq!(panel.ui.get_int_editor_draft(0), Some(10));
+    assert_eq!(panel.ui.get_int_editor_draft(&INT_LEVEL), Some(10));
     panel.press(KEY_DOWN); // 值减一
-    assert_eq!(panel.ui.get_int_editor_draft(0), Some(9));
+    assert_eq!(panel.ui.get_int_editor_draft(&INT_LEVEL), Some(9));
     panel.press(KEY_OK); // 结束编辑，焦点应落到确认键
     panel.press(KEY_OK); // 提交并关闭
-    assert_eq!(panel.ui.get_int_editor_draft(0), None, "editor must close");
+    assert_eq!(
+        panel.ui.get_int_editor_draft(&INT_LEVEL),
+        None,
+        "editor must close"
+    );
     assert_eq!(INT_VALUE.get(), 9, "committed value");
     assert_eq!(panel.ui.poll_event(), Some(EVENT_INT));
 }

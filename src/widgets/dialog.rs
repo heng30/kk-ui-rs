@@ -22,7 +22,7 @@ pub(crate) use bool_editor::open as open_bool;
 pub(crate) use confirm::open as open_confirm;
 pub(crate) use int_editor::open as open_int;
 pub(crate) use message::open as open_message;
-pub(crate) use state::{DialogFocus, Overlay, OverlayType, Toast};
+pub(crate) use state::{DialogFocus, Overlay, OverlayType, Row, Toast};
 pub(crate) use toast::draw as draw_toast;
 pub(crate) use toast::open as toast_open;
 
@@ -135,7 +135,7 @@ impl Layout {
 fn begin(
     rt: &mut Runtime,
     kind: OverlayType,
-    reference: u16,
+    row: Option<Row>,
     text: &'static str,
     event: EventId,
     now: u32,
@@ -145,7 +145,7 @@ fn begin(
     }
     rt.toast.visible = false;
     rt.overlay.kind = kind;
-    rt.overlay.reference = reference;
+    rt.overlay.row = row;
     rt.overlay.text = text;
     rt.overlay.event = event;
     rt.overlay.origin_y = dialog_origin(rt);

@@ -1,22 +1,30 @@
 //! 开关编辑器弹窗：关/开文字与滑动滑块。
 
-use super::{Overlay, OverlayType};
+use super::{Overlay, OverlayType, Row};
 use crate::gfx::Frame;
-use crate::model::{EVENT_NONE, InputEvent, InputSource};
+use crate::model::{BoolBinding, EVENT_NONE, InputEvent, InputSource};
 use crate::ui::{Q12_ONE, Runtime, Status};
 use crate::widgets::utils;
 
+/// 取覆盖层里的开关绑定。
+fn binding(rt: &Runtime) -> &'static BoolBinding {
+    match rt.overlay.row {
+        Some(Row::Bool(binding)) => binding,
+        _ => panic!("overlay without bool binding"),
+    }
+}
+
 /// 打开开关编辑器。
-pub(crate) fn open(rt: &mut Runtime, index: u16, now: u32) -> Status {
-    let Some(value) = rt
-        .app
-        .bool_bindings
-        .get(index as usize)
-        .map(|binding| i32::from(binding.value.get()))
-    else {
-        return Status::InvalidArgument;
-    };
-    let status = super::begin(rt, OverlayType::Bool, index, "", EVENT_NONE, now);
+pub(crate) fn open(rt: &mut Runtime, entry: &'static BoolBinding, now: u32) -> Status {
+    let value = i32::from(entry.value.get());
+    let status = super::begin(
+        rt,
+        OverlayType::Bool,
+        Some(Row::Bool(entry)),
+        "",
+        EVENT_NONE,
+        now,
+    );
     if status == Status::Ok {
         rt.overlay.draft = value;
         rt.overlay.original = value;
@@ -38,14 +46,13 @@ pub(crate) fn change(rt: &mut Runtime, event: InputEvent, now: u32) {
 
 /// 提交编辑器结果。
 pub(crate) fn commit(rt: &mut Runtime, now: u32) {
-    let app = rt.app;
-    let binding = &app.bool_bindings[rt.overlay.reference as usize];
+    let entry = binding(rt);
     let draft = rt.overlay.draft;
     if draft != rt.overlay.original {
-        if !super::event_or_reject(rt, binding.changed_event) {
+        if !super::event_or_reject(rt, entry.changed_event) {
             return;
         }
-        binding.value.set(draft != 0);
+        entry.value.set(draft != 0);
     }
     super::close(rt, now);
 }
@@ -54,8 +61,7 @@ pub(crate) fn commit(rt: &mut Runtime, now: u32) {
 pub(crate) fn draw(rt: &mut Runtime<'_>, layout: &super::Layout) {
     let app = rt.app;
     let overlay = rt.overlay;
-    let binding = &app.bool_bindings[overlay.reference as usize];
-    super::draw_title(rt, layout, binding.title);
+    super::draw_title(rt, layout, binding(rt).title);
     draw_value(
         &overlay,
         app.texts.on_text,

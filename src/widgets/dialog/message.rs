@@ -7,7 +7,7 @@ use crate::widgets::utils;
 
 /// 打开消息框。
 pub(crate) fn open(rt: &mut Runtime, text: &'static str, event: EventId, now: u32) -> Status {
-    super::begin(rt, OverlayType::Message, 0, text, event, now)
+    super::begin(rt, OverlayType::Message, None, text, event, now)
 }
 
 /// 处理输入：确定时入队事件并关闭。

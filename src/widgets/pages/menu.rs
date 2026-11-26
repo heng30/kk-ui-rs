@@ -303,12 +303,8 @@ fn draw_disabled(frame: &mut Frame<'_>, x: i16, y: i16) {
 /// 条目右列的取值文本。
 fn menu_value<'a>(rt: &Runtime, item: &MenuItem, buffer: &'a mut [u8; 20]) -> &'a str {
     match item.action {
-        MenuAction::Int(reference) => {
-            let binding = &rt.app.int_bindings[reference as usize];
-            utils::format_int(binding.value.get(), binding.unit, buffer)
-        }
-        MenuAction::Bool(reference) => {
-            let binding = &rt.app.bool_bindings[reference as usize];
+        MenuAction::Int(binding) => utils::format_int(binding.value.get(), binding.unit, buffer),
+        MenuAction::Bool(binding) => {
             if binding.value.get() {
                 rt.app.texts.on_text
             } else {

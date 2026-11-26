@@ -32,17 +32,9 @@ impl Runtime<'_> {
 
                     for item in page.items {
                         let valid = match item.action {
-                            MenuAction::Page(_) => true,
+                            MenuAction::Page(_) | MenuAction::Int(_) | MenuAction::Bool(_) => true,
+                            MenuAction::Confirm(_) => true,
                             MenuAction::Event(event) => event != EVENT_NONE,
-                            MenuAction::Int(reference) => {
-                                (reference as usize) < app.int_bindings.len()
-                            }
-                            MenuAction::Bool(reference) => {
-                                (reference as usize) < app.bool_bindings.len()
-                            }
-                            MenuAction::Confirm(reference) => {
-                                (reference as usize) < app.confirm_descs.len()
-                            }
                         };
                         if !valid {
                             return Err((Some(*route), index as u16));

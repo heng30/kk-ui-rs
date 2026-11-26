@@ -1,22 +1,29 @@
 //! 确认框弹窗：正文 + 取消/确定，上下键在两个按钮间切换。
 
-use super::{DialogFocus, OverlayType};
+use super::{DialogFocus, OverlayType, Row};
 use crate::gfx::Frame;
-use crate::model::{EVENT_NONE, InputAction, InputEvent};
+use crate::model::{ConfirmDesc, EVENT_NONE, InputAction, InputEvent};
 use crate::ui::{Runtime, Status};
 use crate::widgets::utils;
 
+/// 取覆盖层里的确认框描述。
+fn desc(rt: &Runtime) -> &'static ConfirmDesc {
+    match rt.overlay.row {
+        Some(Row::Confirm(desc)) => desc,
+        _ => panic!("overlay without confirm"),
+    }
+}
+
 /// 打开确认框。
-pub(crate) fn open(rt: &mut Runtime, index: u16, now: u32) -> Status {
-    let Some(text) = rt
-        .app
-        .confirm_descs
-        .get(index as usize)
-        .map(|desc| desc.text)
-    else {
-        return Status::InvalidArgument;
-    };
-    super::begin(rt, OverlayType::Confirm, index, text, EVENT_NONE, now)
+pub(crate) fn open(rt: &mut Runtime, entry: &'static ConfirmDesc, now: u32) -> Status {
+    super::begin(
+        rt,
+        OverlayType::Confirm,
+        Some(Row::Confirm(entry)),
+        entry.text,
+        EVENT_NONE,
+        now,
+    )
 }
 
 /// 处理输入：确定执行当前焦点、上下键在两个按钮间切换。
@@ -35,7 +42,7 @@ pub(crate) fn input(rt: &mut Runtime, event: InputEvent, now: u32) {
 
 /// 执行确认框当前焦点对应的动作。
 fn action(rt: &mut Runtime, now: u32) {
-    let desc = &rt.app.confirm_descs[rt.overlay.reference as usize];
+    let desc = desc(rt);
     let event = if rt.overlay.focus_mode == DialogFocus::Confirm {
         desc.confirmed_event
     } else {

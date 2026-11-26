@@ -10,8 +10,8 @@ use super::{
     Status,
 };
 use crate::gfx::Frame;
-use crate::model::{App, EVENT_NONE, EventId, ItemState, PageRoute, PageType};
-use crate::widgets::dialog::{Overlay, OverlayType, Toast};
+use crate::model::{App, EVENT_NONE, EventId, IntBinding, ItemState, PageRoute, PageType};
+use crate::widgets::dialog::{Overlay, OverlayType, Row, Toast};
 use crate::widgets::pages;
 
 /// UI 运行时状态；自绘页回调也通过它访问画布与 UI 接口。
@@ -95,7 +95,7 @@ impl<'a> Runtime<'a> {
             },
             deferred: Deferred {
                 kind: DeferredType::None,
-                reference: 0,
+                row: None,
                 event: EVENT_NONE,
                 text: "",
                 duration: 0,
@@ -207,15 +207,14 @@ impl<'a> Runtime<'a> {
     }
 
     /// 读取整数编辑器草稿；编辑器未打开时返回 `None`。
-    pub fn get_int_editor_draft(&self, binding_index: u16) -> Option<i32> {
-        if !self.initialized
-            || self.overlay.kind != OverlayType::Int
-            || self.overlay.closing
-            || self.overlay.reference != binding_index
-        {
+    pub fn get_int_editor_draft(&self, binding: &'static IntBinding) -> Option<i32> {
+        if !self.initialized || self.overlay.kind != OverlayType::Int || self.overlay.closing {
             return None;
         }
-        Some(self.overlay.draft)
+        match self.overlay.row {
+            Some(Row::Int(current)) if core::ptr::eq(current, binding) => Some(self.overlay.draft),
+            _ => None,
+        }
     }
 
     /// 设置菜单条目状态。

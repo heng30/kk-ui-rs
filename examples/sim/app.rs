@@ -5,7 +5,7 @@
 //! 改了一边记得同步另一边。
 
 use kk_ui::{
-    App, BoolBinding, ConfirmDesc, CustomPageHandler, DrawMode, EventId, Frame, HomeItem, HomePage,
+    App, BoolBinding, ConfirmDesc, CustomPageHandler, DrawMode, Frame, HomeItem, HomePage,
     InfoPage, InfoRow, InputAction, InputEvent, IntBinding, ItemState, KEY_DOWN, KEY_OK, KkUi,
     MenuAction, MenuItem, MenuPage, PageRoute, Runtime, Shared, Text, Texts, draw_progress_bar,
 };
@@ -39,43 +39,77 @@ pub static ROUTE_COMPONENTS: PageRoute = PageRoute::Menu(&MenuPage {
 /// 页面：数学。
 pub static ROUTE_MATH: PageRoute = PageRoute::Custom(&MATH);
 
-/// 绑定下标：屏幕亮度。
-const INT_BRIGHTNESS: u16 = 0;
-/// 绑定下标：动画间隔。
-const INT_INTERVAL: u16 = 1;
+/// 整数编辑器绑定：屏幕亮度。
+static INT_BRIGHTNESS: IntBinding = IntBinding {
+    title: "屏幕亮度",
+    value: &BRIGHTNESS,
+    minimum: 10,
+    maximum: 100,
+    step: 1,
+    unit: "%",
+    changed_event: EVENT_BRIGHTNESS_CHANGED,
+};
+/// 整数编辑器绑定：动画间隔。
+static INT_INTERVAL: IntBinding = IntBinding {
+    title: "动画间隔",
+    value: &ANIMATION_INTERVAL,
+    minimum: 10,
+    maximum: 100,
+    step: 10,
+    unit: "ms",
+    changed_event: EVENT_INTERVAL_CHANGED,
+};
 
-/// 绑定下标：开关。
-const BOOL_SWITCH: u16 = 0;
-/// 绑定下标：显示条目。
-const BOOL_SHOW_ITEM: u16 = 1;
-/// 绑定下标：禁用条目。
-const BOOL_DISABLE_ITEM: u16 = 2;
+/// 开关编辑器绑定：开关。
+static BOOL_SWITCH: BoolBinding = BoolBinding {
+    title: "开关",
+    value: &DEMO_SWITCH,
+    changed_event: EVENT_SWITCH_CHANGED,
+};
+/// 开关编辑器绑定：显示条目。
+static BOOL_SHOW_ITEM: BoolBinding = BoolBinding {
+    title: "显示条目",
+    value: &SHOW_ITEM,
+    changed_event: EVENT_ADVANCED_VISIBILITY_CHANGED,
+};
+/// 开关编辑器绑定：禁用条目。
+static BOOL_DISABLE_ITEM: BoolBinding = BoolBinding {
+    title: "禁用条目",
+    value: &DISABLE_ITEM,
+    changed_event: EVENT_DEMO_LOCK_CHANGED,
+};
 
-/// 确认框下标：恢复默认设置。
-const CONFIRM_RESET: u16 = 0;
+/// 确认框：恢复默认设置。
+static CONFIRM_RESET: ConfirmDesc = ConfirmDesc {
+    text: "恢复默认设置？\n包含屏幕亮度",
+    confirmed_event: EVENT_RESET_CONFIRMED,
+    cancelled_event: EVENT_RESET_CANCELLED,
+};
 
-/// 事件：亮度改变。
-pub const EVENT_BRIGHTNESS_CHANGED: EventId = 1;
-/// 事件：开关改变。
-pub const EVENT_SWITCH_CHANGED: EventId = 2;
-/// 事件：动画间隔改变。
-pub const EVENT_INTERVAL_CHANGED: EventId = 3;
-/// 事件：确认恢复默认。
-pub const EVENT_RESET_CONFIRMED: EventId = 4;
-/// 事件：取消恢复默认。
-pub const EVENT_RESET_CANCELLED: EventId = 5;
-/// 事件：弹出消息框。
-pub const EVENT_SHOW_MESSAGE: EventId = 6;
-/// 事件：消息框已确认。
-pub const EVENT_MESSAGE_ACKNOWLEDGED: EventId = 7;
-/// 事件：条目可见性改变。
-pub const EVENT_ADVANCED_VISIBILITY_CHANGED: EventId = 8;
-/// 事件：条目禁用改变。
-pub const EVENT_DEMO_LOCK_CHANGED: EventId = 9;
-/// 事件：普通操作示例。
-pub const EVENT_ADVANCED_ACTION: EventId = 10;
-/// 事件：弹出 Toast。
-pub const EVENT_SHOW_TOAST: EventId = 11;
+kk_ui::event_ids! {
+    /// 事件：亮度改变。
+    EVENT_BRIGHTNESS_CHANGED,
+    /// 事件：开关改变。
+    EVENT_SWITCH_CHANGED,
+    /// 事件：动画间隔改变。
+    EVENT_INTERVAL_CHANGED,
+    /// 事件：确认恢复默认。
+    EVENT_RESET_CONFIRMED,
+    /// 事件：取消恢复默认。
+    EVENT_RESET_CANCELLED,
+    /// 事件：弹出消息框。
+    EVENT_SHOW_MESSAGE,
+    /// 事件：消息框已确认。
+    EVENT_MESSAGE_ACKNOWLEDGED,
+    /// 事件：条目可见性改变。
+    EVENT_ADVANCED_VISIBILITY_CHANGED,
+    /// 事件：条目禁用改变。
+    EVENT_DEMO_LOCK_CHANGED,
+    /// 事件：普通操作示例。
+    EVENT_ADVANCED_ACTION,
+    /// 事件：弹出 Toast。
+    EVENT_SHOW_TOAST,
+}
 
 // 图标是 32×32 XBM，每个 128 字节。
 static ICON_SETTINGS: &[u8] = include_bytes!("assets/icon0.bin");
@@ -153,11 +187,11 @@ static HOME_ITEMS: [HomeItem; 5] = [
 static SETTINGS_ITEMS: [MenuItem; 6] = [
     MenuItem {
         label: "屏幕亮度",
-        action: MenuAction::Int(INT_BRIGHTNESS),
+        action: MenuAction::Int(&INT_BRIGHTNESS),
     },
     MenuItem {
         label: "开关",
-        action: MenuAction::Bool(BOOL_SWITCH),
+        action: MenuAction::Bool(&BOOL_SWITCH),
     },
     MenuItem {
         label: "组件演示",
@@ -165,7 +199,7 @@ static SETTINGS_ITEMS: [MenuItem; 6] = [
     },
     MenuItem {
         label: "确认框",
-        action: MenuAction::Confirm(CONFIRM_RESET),
+        action: MenuAction::Confirm(&CONFIRM_RESET),
     },
     MenuItem {
         label: "消息框",
@@ -180,15 +214,15 @@ static SETTINGS_ITEMS: [MenuItem; 6] = [
 static COMPONENT_ITEMS: [MenuItem; 4] = [
     MenuItem {
         label: "动画间隔",
-        action: MenuAction::Int(INT_INTERVAL),
+        action: MenuAction::Int(&INT_INTERVAL),
     },
     MenuItem {
         label: "显示条目",
-        action: MenuAction::Bool(BOOL_SHOW_ITEM),
+        action: MenuAction::Bool(&BOOL_SHOW_ITEM),
     },
     MenuItem {
         label: "禁用条目",
-        action: MenuAction::Bool(BOOL_DISABLE_ITEM),
+        action: MenuAction::Bool(&BOOL_DISABLE_ITEM),
     },
     MenuItem {
         label: "操作示例",
@@ -262,53 +296,12 @@ static ABOUT_ROWS: [InfoRow; 10] = [
     },
 ];
 
-static INT_BINDINGS: [IntBinding; 2] = [
-    IntBinding {
-        title: "屏幕亮度",
-        value: &BRIGHTNESS,
-        minimum: 10,
-        maximum: 100,
-        step: 1,
-        unit: "%",
-        changed_event: EVENT_BRIGHTNESS_CHANGED,
-    },
-    IntBinding {
-        title: "动画间隔",
-        value: &ANIMATION_INTERVAL,
-        minimum: 10,
-        maximum: 100,
-        step: 10,
-        unit: "ms",
-        changed_event: EVENT_INTERVAL_CHANGED,
-    },
-];
-
-static BOOL_BINDINGS: [BoolBinding; 3] = [
-    BoolBinding {
-        title: "开关",
-        value: &DEMO_SWITCH,
-        changed_event: EVENT_SWITCH_CHANGED,
-    },
-    BoolBinding {
-        title: "显示条目",
-        value: &SHOW_ITEM,
-        changed_event: EVENT_ADVANCED_VISIBILITY_CHANGED,
-    },
-    BoolBinding {
-        title: "禁用条目",
-        value: &DISABLE_ITEM,
-        changed_event: EVENT_DEMO_LOCK_CHANGED,
-    },
-];
+static INT_BINDINGS: [&IntBinding; 2] = [&INT_BRIGHTNESS, &INT_INTERVAL];
+static BOOL_BINDINGS: [&BoolBinding; 3] = [&BOOL_SWITCH, &BOOL_SHOW_ITEM, &BOOL_DISABLE_ITEM];
+static CONFIRM_DESCS: [&ConfirmDesc; 1] = [&CONFIRM_RESET];
 
 static WAVE: Wave = Wave::new();
 static MATH: MathPage = MathPage::new();
-
-static CONFIRM_DESCS: [ConfirmDesc; 1] = [ConfirmDesc {
-    text: "恢复默认设置？\n包含屏幕亮度",
-    confirmed_event: EVENT_RESET_CONFIRMED,
-    cancelled_event: EVENT_RESET_CANCELLED,
-}];
 
 static ROUTES: [&PageRoute; 7] = [
     &ROUTE_HOME,

@@ -19,7 +19,9 @@ mod timing;
 mod validate;
 
 use crate::gfx::Frame;
-use crate::model::{App, EventId, Input, ItemState, PageRoute};
+use crate::model::{
+    App, BoolBinding, ConfirmDesc, EventId, Input, IntBinding, ItemState, PageRoute,
+};
 use crate::widgets::{dialog, pages};
 
 pub(crate) use anim::{ease_q12, lerp_q12, round_q8};
@@ -125,8 +127,8 @@ impl<'a> KkUi<'a> {
     }
 
     /// 读取整数编辑器草稿。
-    pub fn get_int_editor_draft(&self, binding_index: u16) -> Option<i32> {
-        self.rt.get_int_editor_draft(binding_index)
+    pub fn get_int_editor_draft(&self, binding: &'static IntBinding) -> Option<i32> {
+        self.rt.get_int_editor_draft(binding)
     }
 
     /// 显示工作是否已经静止。
@@ -150,18 +152,18 @@ impl<'a> KkUi<'a> {
     }
 
     /// 打开整数编辑器。
-    pub fn open_int_editor(&mut self, binding_index: u16) -> Status {
-        self.rt.open_int_editor(binding_index)
+    pub fn open_int_editor(&mut self, binding: &'static IntBinding) -> Status {
+        self.rt.open_int_editor(binding)
     }
 
     /// 打开开关编辑器。
-    pub fn open_bool_editor(&mut self, binding_index: u16) -> Status {
-        self.rt.open_bool_editor(binding_index)
+    pub fn open_bool_editor(&mut self, binding: &'static BoolBinding) -> Status {
+        self.rt.open_bool_editor(binding)
     }
 
     /// 打开确认框。
-    pub fn open_confirm(&mut self, confirm_index: u16) -> Status {
-        self.rt.open_confirm(confirm_index)
+    pub fn open_confirm(&mut self, desc: &'static ConfirmDesc) -> Status {
+        self.rt.open_confirm(desc)
     }
 
     /// 打开消息框。
