@@ -1,6 +1,6 @@
 //! 文本编辑器弹窗：预览行加四行软键盘，上下键在行内移动，确定按下键。
 //!
-//! 每行两端是 `[` / `]` 换行按钮：面板只有上、下、确定三个键，行内靠上下键横着走，
+//! 每行两端是上下箭头的换行按钮：面板只有上、下、确定三个键，行内靠上下键横着走，
 //! 换行靠按确定踩这两个按钮，退格只在字符区的最后一行。字母层与数字符号层各有一套字符表，`C` 是锁定式
 //! 大写，`123`/`abc` 切层。屏幕矮到放不下四行完整键时字形会被裁剪，见 [`keyboard_area`]。
 
@@ -53,7 +53,7 @@ const FOOTER_SPANS: [u8; 4] = [LAYER_SPAN, SPACE_SPAN, CANCEL_SPAN, DONE_SPAN];
 const FOOTER_SLOTS: u8 = LAYER_SPAN + SPACE_SPAN + CANCEL_SPAN + DONE_SPAN;
 /// 每个换行/退格按钮占的格子数。
 const EDGE_SPAN: u8 = 1;
-/// 每行固定占用在中间键之外的列数：左端 `^`、右端 `v`。
+/// 每行固定占用在中间键之外的列数：左端朝上箭头、右端朝下箭头。
 const EDGE_COLUMNS: u8 = 2;
 
 /// 预览行高度，含上下边框。
@@ -198,10 +198,10 @@ fn key_rect(rt: &Runtime, symbols: bool, row: u8, col: u8) -> (i16, i16, i16, i1
 pub(crate) fn input(rt: &mut Runtime, event: InputEvent, now: u32) {
     let steps = event.steps.min(127) as i16;
     match event.action {
-        InputAction::Ok => press(rt, now),
+        // 长按确定在键盘上就是按一下键，返回只有「esc」和面板的返回键。
+        InputAction::Ok | InputAction::Back => press(rt, now),
         InputAction::Up => move_cursor(rt, -steps),
         InputAction::Down => move_cursor(rt, steps),
-        InputAction::Back => {} // 返回已在 `dialog::input` 拦截，不会走到这里。
     }
 }
 
@@ -371,8 +371,11 @@ fn draw_key(rt: &mut Runtime<'_>, row: u8, col: u8) {
         Key::Backspace => "<",
         Key::Cancel => "esc",
         Key::Done => "ok",
-        Key::RowUp => "[",
-        Key::RowDown => "]",
+        Key::RowUp | Key::RowDown => {
+            let (cx, cy) = (x + width / 2, y + height / 2);
+            crate::widgets::draw_caret(&mut rt.frame, cx - 3, cy, key == Key::RowUp, 3);
+            return;
+        }
     };
     let text_width = rt.frame.text_width(text) as i16;
     let tx = x + (width - text_width) / 2;

@@ -38,6 +38,24 @@ pub fn draw_chevron(frame: &mut Frame<'_>, x: i16, cy: i16, right: bool, size: i
     }
 }
 
+/// 上下方向的尖角（caret）：`x` 是尖角的左边缘，`cy` 是垂直中心，`up` 为真时朝上。
+///
+/// 两种朝向都以 `cy` 为中心、上下各伸 `size / 2` 像素；`size` 是半宽。
+pub fn draw_caret(frame: &mut Frame<'_>, x: i16, cy: i16, up: bool, size: i16) {
+    if size <= 0 {
+        return;
+    }
+    for half in 0..=size {
+        let y = if up {
+            cy + size / 2 - size + half
+        } else {
+            cy + size / 2 - half
+        };
+        frame.draw_pixel(x + size - half, y);
+        frame.draw_pixel(x + size + half, y);
+    }
+}
+
 /// 电池图标：`x`/`y` 是左上角，`level_q12` 是 0..4096 的电量。
 pub fn draw_battery(frame: &mut Frame<'_>, x: i16, y: i16, level_q12: u16) {
     frame.draw_frame(x, y, 11, 6);
@@ -104,6 +122,37 @@ mod tests {
         let small = lit(32, 32, |frame| draw_chevron(frame, 4, 16, true, 3));
         let large = lit(32, 32, |frame| draw_chevron(frame, 4, 16, true, 6));
         assert!(large > small, "{large} > {small}");
+    }
+
+    #[test]
+    fn a_caret_grows_with_its_size() {
+        let small = lit(32, 32, |frame| draw_caret(frame, 4, 16, true, 3));
+        let large = lit(32, 32, |frame| draw_caret(frame, 4, 16, true, 6));
+        assert!(large > small, "{large} > {small}");
+    }
+
+    /// 画出尖角，返回亮像素所在的最上、最下行。
+    fn caret_rows(up: bool) -> (i16, i16) {
+        let mut buffer = [0u8; 128];
+        let mut frame = Frame::new(&mut buffer[..Frame::buffer_len(32, 32)], 32, 32);
+        draw_caret(&mut frame, 4, 16, up, 4);
+        let lit =
+            |x: i16, y: i16| frame.buffer()[(y as usize / 8) * 32 + x as usize] >> (y % 8) & 1 == 1;
+        let mut rows = (i16::MAX, i16::MIN);
+        for y in 0..32i16 {
+            if (0..32i16).any(|x| lit(x, y)) {
+                rows.0 = rows.0.min(y);
+                rows.1 = rows.1.max(y);
+            }
+        }
+        rows
+    }
+
+    #[test]
+    fn carets_point_apart_and_stay_centred() {
+        // 以 `cy` 为中心上下对称，不偏上也不偏下。
+        assert_eq!(caret_rows(true), (14, 18));
+        assert_eq!(caret_rows(false), (14, 18));
     }
 
     #[test]

@@ -36,7 +36,7 @@ pub use model::{
 };
 pub use ui::{CustomPageHandler, ErrorInfo, KkUi, PowerPhase, Runtime, Status, TransitionKind};
 pub use widgets::{
-    Scrollbar, draw_battery, draw_chevron, draw_focus, draw_progress_bar, draw_spinner,
+    Scrollbar, draw_battery, draw_caret, draw_chevron, draw_focus, draw_progress_bar, draw_spinner,
     draw_switch, draw_wifi, utils::format_int,
 };
 

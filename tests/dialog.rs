@@ -235,3 +235,22 @@ fn loading_dialog_rejects_a_second_overlay() {
     assert_eq!(panel.ui.show_loading("Again"), kk_ui::Status::Busy);
     assert_eq!(panel.ui.show_message("Hi", EVENT_INT), kk_ui::Status::Busy);
 }
+
+#[test]
+fn int_editor_keeps_redrawing_until_the_digits_settle() {
+    let mut panel = Panel::new();
+    panel.press(KEY_OK); // 首页 → 菜单
+    panel.press(KEY_OK); // 打开整数编辑器
+    for _ in 0..8 {
+        panel.step(KEY_DOWN); // 按住，值减一
+    }
+    panel.ui.take_frame_ready();
+    // 数值补间只有 100 ms，逐位滚要 300 ms：中间不能断帧，否则数字卡在半路。
+    for _ in 0..50 {
+        panel.step(0); // 之后 250 ms 不再输入
+    }
+    assert!(
+        panel.ui.take_frame_ready(),
+        "frames must keep coming while the digits roll"
+    );
+}

@@ -340,6 +340,15 @@ pub(crate) fn input(rt: &mut Runtime, event: InputEvent, now: u32) {
                     now,
                 );
             }
+            // 软键盘上长按确定就是按一下键，不能当返回用。
+            OverlayType::LineInput => line_input::input(
+                rt,
+                InputEvent {
+                    action: InputAction::Ok,
+                    ..event
+                },
+                now,
+            ),
             _ => close(rt, now),
         }
         return;
@@ -456,6 +465,10 @@ pub(crate) fn animate(rt: &mut Runtime, now: u32) {
             if rt.overlay.value_q12 == Q12_ONE {
                 rt.overlay.value_moving = false;
             }
+        }
+        // 取值逐位滚比数值补间长，滚完之前都得继续重画。
+        if rt.overlay.roll.busy(now) {
+            redraw = true;
         }
         if redraw || rt.overlay.kind == OverlayType::Loading {
             // 指示器位置按时间算，没有补间状态可以触发重画。

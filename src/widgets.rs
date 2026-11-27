@@ -19,7 +19,7 @@ pub(crate) mod toggle;
 pub(crate) mod utils;
 
 pub use focus::draw_focus;
-pub use icons::{draw_battery, draw_chevron, draw_spinner, draw_wifi};
+pub use icons::{draw_battery, draw_caret, draw_chevron, draw_spinner, draw_wifi};
 pub use progress_bar::draw_progress_bar;
 pub use scrollbar::Scrollbar;
 pub use switch::draw_switch;

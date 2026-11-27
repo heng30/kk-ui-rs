@@ -118,10 +118,6 @@ impl KkUi<'_> {
                         );
                     }
                 }
-                if (0..width).contains(&boundary) {
-                    self.rt.frame.reset_clip();
-                    self.rt.frame.draw_vline(boundary, 0, height as u16);
-                }
             }
         } else {
             self.draw_page(self.rt.current, true, 0, 0, width as u16);

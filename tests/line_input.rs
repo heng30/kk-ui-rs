@@ -236,3 +236,31 @@ fn cancel_discards_the_buffer() {
     assert!(NAME.with(|text| text == "keep"));
     assert_eq!(panel.ui.poll_event(), None);
 }
+
+#[test]
+fn a_long_press_types_instead_of_returning() {
+    let _guard = exclusive();
+    let mut panel = Panel::new();
+    panel.open();
+    // 按住确定 500 ms：超过 400 ms 的返回阈值，但键盘上只是按了一下键。
+    for _ in 0..100 {
+        panel.step(KEY_OK);
+    }
+    for _ in 0..12 {
+        panel.step(0);
+    }
+    assert!(
+        panel.ui.line_input_open(&LINE_INPUT),
+        "a long press must not close the keyboard"
+    );
+    // 打出的是光标下的 `q`：走到 `ok` 提交看看。
+    panel.down(ROW0_MAX - 1);
+    panel.tap(KEY_OK);
+    panel.tap(KEY_OK);
+    panel.tap(KEY_OK);
+    panel.up(ROW3_MAX - OK_COL);
+    panel.tap(KEY_OK);
+    assert!(!panel.ui.line_input_open(&LINE_INPUT));
+    assert!(NAME.with(|text| text == "q"), "the long press typed once");
+    assert_eq!(panel.ui.poll_event(), Some(EVENT_NAME));
+}
