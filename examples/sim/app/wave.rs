@@ -80,7 +80,7 @@ impl CustomPageHandler for Wave {
     fn on_input(&self, ui: &mut Runtime, _page: &'static PageRoute, event: InputEvent) {
         let mut state = self.state.get();
         match event.action {
-            InputAction::Ok => {
+            InputAction::Ok | InputAction::Back => {
                 ui.custom_request_close();
             }
             InputAction::Up => {

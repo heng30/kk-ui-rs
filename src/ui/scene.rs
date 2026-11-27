@@ -1,6 +1,6 @@
 //! 整屏场景绘制：页面切换、拒绝闪烁、弹窗与 Toast。
 
-use super::{KkUi, PAGE_MS, PAGE_PARALLAX, PageState, Q12_ONE, ease_q12};
+use super::{Curve, KkUi, PAGE_MS, PAGE_PARALLAX, PageState, Q12_ONE, TransitionKind, curve_q12};
 use crate::gfx::DrawMode;
 use crate::model::PageType;
 use crate::widgets::{dialog, pages};
@@ -63,48 +63,65 @@ impl KkUi<'_> {
         let height = self.rt.frame.height();
 
         if self.rt.transition.active {
-            let progress = ease_q12(now.wrapping_sub(self.rt.transition.started), PAGE_MS);
+            let curve = if self.rt.transition.kind == TransitionKind::Fade {
+                Curve::InOut
+            } else {
+                Curve::Decel
+            };
+            let progress = curve_q12(curve, now.wrapping_sub(self.rt.transition.started), PAGE_MS);
             let outgoing = self.rt.transition.outgoing;
             let current = self.rt.current;
-            let boundary;
-            if !self.rt.transition.reverse {
-                let outgoing_x =
-                    -((PAGE_PARALLAX as i32 * progress as i32) / Q12_ONE as i32) as i16;
-                let current_x =
-                    (width as i32 * (Q12_ONE as i32 - progress as i32) / Q12_ONE as i32) as i16;
-                boundary = current_x;
-                if boundary > 0 {
-                    self.draw_page(outgoing, false, outgoing_x, 0, boundary as u16);
-                }
-                if boundary < width {
-                    self.draw_page(
-                        current,
-                        true,
-                        current_x,
-                        boundary,
-                        (width - boundary) as u16,
-                    );
-                }
+            if self.rt.transition.kind == TransitionKind::Fade {
+                // 两页用互补的有序抖动掩码交错，不需要第二块帧缓冲。
+                let split = (16 * progress as u32 / Q12_ONE as u32) as u8;
+                let keep = 16 - split;
+                self.rt.frame.set_dither(keep, false);
+                self.draw_page(outgoing, false, 0, 0, width as u16);
+                self.rt.frame.set_dither(keep, true);
+                self.draw_page(current, true, 0, 0, width as u16);
+                self.rt.frame.reset_dither();
             } else {
-                let outgoing_x = (PAGE_PARALLAX as i32 * progress as i32 / Q12_ONE as i32) as i16;
-                boundary = (width as i32 * progress as i32 / Q12_ONE as i32) as i16;
-                let current_x = boundary - width;
-                if boundary > 0 {
-                    self.draw_page(current, true, current_x, 0, boundary as u16);
+                let boundary;
+                if !self.rt.transition.reverse {
+                    let outgoing_x =
+                        -((PAGE_PARALLAX as i32 * progress as i32) / Q12_ONE as i32) as i16;
+                    let current_x =
+                        (width as i32 * (Q12_ONE as i32 - progress as i32) / Q12_ONE as i32) as i16;
+                    boundary = current_x;
+                    if boundary > 0 {
+                        self.draw_page(outgoing, false, outgoing_x, 0, boundary as u16);
+                    }
+                    if boundary < width {
+                        self.draw_page(
+                            current,
+                            true,
+                            current_x,
+                            boundary,
+                            (width - boundary) as u16,
+                        );
+                    }
+                } else {
+                    let outgoing_x =
+                        (PAGE_PARALLAX as i32 * progress as i32 / Q12_ONE as i32) as i16;
+                    boundary = (width as i32 * progress as i32 / Q12_ONE as i32) as i16;
+                    let current_x = boundary - width;
+                    if boundary > 0 {
+                        self.draw_page(current, true, current_x, 0, boundary as u16);
+                    }
+                    if boundary < width {
+                        self.draw_page(
+                            outgoing,
+                            false,
+                            outgoing_x,
+                            boundary,
+                            (width - boundary) as u16,
+                        );
+                    }
                 }
-                if boundary < width {
-                    self.draw_page(
-                        outgoing,
-                        false,
-                        outgoing_x,
-                        boundary,
-                        (width - boundary) as u16,
-                    );
+                if (0..width).contains(&boundary) {
+                    self.rt.frame.reset_clip();
+                    self.rt.frame.draw_vline(boundary, 0, height as u16);
                 }
-            }
-            if (0..width).contains(&boundary) {
-                self.rt.frame.reset_clip();
-                self.rt.frame.draw_vline(boundary, 0, height as u16);
             }
         } else {
             self.draw_page(self.rt.current, true, 0, 0, width as u16);

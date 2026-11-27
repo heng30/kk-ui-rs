@@ -229,3 +229,144 @@ fn choice_editor_stops_at_the_last_label() {
     panel.press(KEY_OK);
     assert_eq!(REFRESH.get(), 2, "index is clamped to the label count");
 }
+
+#[test]
+fn power_phase_follows_the_time_since_the_last_key() {
+    let mut panel = Panel::new();
+    panel.ui.set_power_timeouts(100, 300);
+    assert_eq!(panel.ui.idle_ms(), 0);
+    assert_eq!(panel.ui.power_phase(), kk_ui::PowerPhase::Awake);
+
+    // 空转到变暗阈值：只过了时间，没有输入。
+    for _ in 0..20 {
+        panel.step(0);
+    }
+    assert_eq!(panel.ui.idle_ms(), 100);
+    assert_eq!(panel.ui.power_phase(), kk_ui::PowerPhase::Dim);
+
+    for _ in 0..40 {
+        panel.step(0);
+    }
+    assert_eq!(panel.ui.power_phase(), kk_ui::PowerPhase::Sleep);
+
+    // 一次按键把计时清零。
+    panel.step(KEY_DOWN);
+    assert_eq!(panel.ui.idle_ms(), 0);
+    assert_eq!(panel.ui.power_phase(), kk_ui::PowerPhase::Awake);
+}
+
+#[test]
+fn zero_timeouts_disable_the_phases() {
+    let mut panel = Panel::new();
+    panel.ui.set_power_timeouts(0, 0);
+    for _ in 0..200 {
+        panel.step(0);
+    }
+    assert_eq!(panel.ui.power_phase(), kk_ui::PowerPhase::Awake);
+}
+
+/// 按住 `keys` 若干拍再松开：`hold_ms` 超过 400 ms 才算长按。
+fn hold(panel: &mut Panel, keys: u8, hold_ms: u32) {
+    for _ in 0..hold_ms / 5 {
+        panel.step(keys);
+    }
+    for _ in 0..70 {
+        panel.step(0);
+    }
+}
+
+#[test]
+fn a_short_ok_press_confirms() {
+    let mut panel = Panel::new();
+    panel.enter_menu();
+    hold(&mut panel, KEY_OK, 40);
+    assert_eq!(LEVEL.get(), 1, "短按确认：切到下一档");
+    assert_eq!(panel.ui.poll_event(), Some(EVENT_LEVEL));
+}
+
+#[test]
+fn holding_ok_long_enough_goes_back_instead_of_confirming() {
+    let mut panel = Panel::new();
+    panel.enter_menu();
+    hold(&mut panel, KEY_OK, 600);
+    assert_eq!(LEVEL.get(), 0, "长按返回，不能顺手把取值改掉");
+    assert_eq!(panel.ui.poll_event(), None, "返回不该入队取值事件");
+    assert!(
+        core::ptr::eq(panel.ui.current_page().expect("page"), &ROUTE_HOME),
+        "长按返回上一页"
+    );
+}
+
+#[test]
+fn holding_ok_in_a_dialog_cancels_it() {
+    let mut panel = Panel::new();
+    panel.enter_menu();
+    panel.press(KEY_DOWN); // 通道行
+    panel.press(KEY_OK); // 打开位掩码弹窗
+    assert!(panel.ui.dialog_open());
+    hold(&mut panel, KEY_OK, 600);
+    assert!(!panel.ui.dialog_open(), "长按取消，弹窗关闭");
+    assert_eq!(CHANNELS.get(), 0, "取消不能写回草稿");
+}
+
+#[test]
+fn an_ok_press_during_a_transition_is_swallowed() {
+    let mut panel = Panel::new();
+    // 直接发起导航，让转场处于播放中，此时才按住确定。
+    assert_eq!(
+        panel.ui.navigate_to(&ROUTE_MENU, panel.now),
+        kk_ui::Status::Ok
+    );
+    hold(&mut panel, KEY_OK, 40);
+    assert!(
+        core::ptr::eq(panel.ui.current_page().expect("page"), &ROUTE_MENU),
+        "转场中按下的确定键不能触发返回，页面保持不动"
+    );
+    assert_eq!(LEVEL.get(), 0, "也不该顺手确认任何条目");
+}
+
+#[test]
+fn the_first_frame_is_fully_dirty_and_a_still_frame_reports_nothing() {
+    let mut panel = Panel::new();
+    // 画布 64 px 高 = 8 页，首次提交要全画。
+    assert_eq!(panel.ui.take_dirty_pages(), 0xFF);
+    assert_eq!(panel.ui.take_dirty_pages(), 0, "没有新画面就没有脏页");
+
+    panel.step(0);
+    panel.step(0);
+    let idle = panel.ui.take_dirty_pages();
+    assert_eq!(idle, 0, "静止时不该再报脏页");
+}
+
+#[test]
+fn a_change_marks_at_least_the_touched_page() {
+    let mut panel = Panel::new();
+    panel.enter_menu();
+    let _ = panel.ui.take_dirty_pages();
+    panel.press(KEY_DOWN);
+    let dirty = panel.ui.take_dirty_pages();
+    assert_ne!(dirty, 0, "换行要报脏页");
+    assert_eq!(dirty & !0xFF, 0, "只能报 8 页范围内的位");
+}
+
+#[test]
+fn the_fade_transition_works_without_a_second_buffer() {
+    let mut panel = Panel::new();
+    panel.ui.set_transition_kind(kk_ui::TransitionKind::Fade);
+    assert_eq!(
+        panel.ui.navigate_to(&ROUTE_MENU, panel.now),
+        kk_ui::Status::Ok
+    );
+    // 转场跑完前后都要能出画面，不 panic、不越界。
+    panel.step(0);
+    let mid = panel.ui.frame().buffer().to_vec();
+    for _ in 0..70 {
+        panel.step(0);
+    }
+    let settled = panel.ui.frame().buffer().to_vec();
+    assert_ne!(mid, settled, "fade 中途与终态的画面不同");
+    assert!(
+        core::ptr::eq(panel.ui.current_page().expect("page"), &ROUTE_MENU),
+        "fade 结束后停在目标页"
+    );
+}

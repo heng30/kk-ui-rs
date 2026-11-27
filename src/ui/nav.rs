@@ -7,6 +7,16 @@ use crate::widgets::{dialog, pages};
 /// 导航栈深度上限。
 pub(super) const NAV_DEPTH: usize = 8;
 
+/// 页面切换的视觉效果。
+#[derive(Clone, Copy, Default, PartialEq, Eq, Debug)]
+pub enum TransitionKind {
+    /// 旧页滑动让位，新页从侧边进。
+    #[default]
+    Slide,
+    /// 两页用互补抖动交错淡入淡出。
+    Fade,
+}
+
 /// 页面切换动画。
 #[derive(Clone, Copy, Default)]
 pub(super) struct PageTransition {
@@ -18,6 +28,8 @@ pub(super) struct PageTransition {
     pub(super) active: bool,
     /// 是返回还是进入，决定两页的滑动方向。
     pub(super) reverse: bool,
+    /// 视觉效果。
+    pub(super) kind: TransitionKind,
 }
 
 impl<'a> Runtime<'a> {
@@ -36,6 +48,7 @@ impl<'a> Runtime<'a> {
             started: now,
             active: true,
             reverse,
+            kind: self.transition_kind,
         };
         if leave_custom {
             self.leave_custom = outgoing.page;

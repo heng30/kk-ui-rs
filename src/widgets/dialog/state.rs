@@ -7,6 +7,7 @@ use crate::model::{
     LINE_INPUT_LEN, LineInputBinding,
 };
 use crate::ui::Q12_ONE;
+use crate::widgets::roll::Roll;
 
 /// 覆盖层类型。
 #[derive(Clone, Copy, PartialEq, Eq)]
@@ -124,6 +125,8 @@ pub(crate) struct Overlay {
     pub focus_moving: bool,
     /// 取值是否正在换值动画。
     pub value_moving: bool,
+    /// 整数编辑器取值的逐位滚动。
+    pub roll: Roll,
 }
 
 impl Overlay {
@@ -159,6 +162,7 @@ impl Overlay {
         closing: false,
         focus_moving: false,
         value_moving: false,
+        roll: Roll::EMPTY,
     };
 }
 

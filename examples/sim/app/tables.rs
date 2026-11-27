@@ -8,6 +8,8 @@ use kk_ui::{
     PageRoute, Texts,
 };
 
+use super::gadgets::Gadgets;
+use super::icons::Icons;
 use super::math::MathPage;
 use super::wave::Wave;
 
@@ -44,6 +46,8 @@ kk_ui::event_ids! {
     EVENT_REFRESH_CHANGED,
     /// 事件：设备名称改变。
     EVENT_DEVICE_NAME_CHANGED,
+    /// 事件：转场效果改变。
+    EVENT_TRANSITION_CHANGED,
 }
 
 // 图标是 32×32 XBM，每个 128 字节。
@@ -67,6 +71,8 @@ kk_ui::shared! {
     DEMO_SWITCH: bool = true,
     SHOW_ITEM: bool = true,
     DISABLE_ITEM: bool = false,
+    /// 页面转场是否用淡入淡出。
+    FADE_TRANSITION: bool = false,
 }
 kk_ui::texts! {
     UPTIME = "0s",
@@ -86,6 +92,9 @@ kk_ui::texts! {
     FPS_INFO = "波形绘制",
     FPS_TEXT = "--",
     PROGRESS_TEXT = "自动 0%",
+    IDLE_TEXT = "0s",
+    PHASE_TEXT = "正常",
+    DIRTY_TEXT = "全部",
 }
 
 kk_ui::shared! {
@@ -142,6 +151,10 @@ pub(super) static ROUTE_CONTROLS: PageRoute = PageRoute::Menu(&MenuPage {
 });
 /// 页面：数学。
 pub(super) static ROUTE_MATH: PageRoute = PageRoute::Custom(&MATH);
+/// 页面：图标绘制助手。
+pub(super) static ROUTE_ICONS: PageRoute = PageRoute::Custom(&ICONS);
+/// 页面：控件绘制助手。
+pub(super) static ROUTE_GADGETS: PageRoute = PageRoute::Custom(&GADGETS);
 
 /// 整数编辑器绑定：屏幕亮度。
 pub(super) static INT_BRIGHTNESS: IntBinding = IntBinding {
@@ -181,6 +194,12 @@ pub(super) static BOOL_DISABLE_ITEM: BoolBinding = BoolBinding {
     title: "禁用条目",
     value: &DISABLE_ITEM,
     changed_event: EVENT_DEMO_LOCK_CHANGED,
+};
+/// 开关编辑器绑定：页面转场用淡入淡出。
+pub(super) static BOOL_FADE: BoolBinding = BoolBinding {
+    title: "淡入淡出",
+    value: &FADE_TRANSITION,
+    changed_event: EVENT_TRANSITION_CHANGED,
 };
 
 /// 分段单选绑定：音频档位。
@@ -290,7 +309,7 @@ pub(super) static SETTINGS_ITEMS: [MenuItem; 9] = [
     },
 ];
 
-pub(super) static COMPONENT_ITEMS: [MenuItem; 4] = [
+pub(super) static COMPONENT_ITEMS: [MenuItem; 7] = [
     MenuItem {
         label: "动画间隔",
         action: MenuAction::Int(&INT_INTERVAL),
@@ -306,6 +325,18 @@ pub(super) static COMPONENT_ITEMS: [MenuItem; 4] = [
     MenuItem {
         label: "操作示例",
         action: MenuAction::Event(EVENT_ADVANCED_ACTION),
+    },
+    MenuItem {
+        label: "淡入淡出",
+        action: MenuAction::Bool(&BOOL_FADE),
+    },
+    MenuItem {
+        label: "图标",
+        action: MenuAction::Page(&ROUTE_ICONS),
+    },
+    MenuItem {
+        label: "控件",
+        action: MenuAction::Page(&ROUTE_GADGETS),
     },
 ];
 
@@ -329,7 +360,7 @@ pub(super) static CONTROL_ITEMS: [MenuItem; 4] = [
     },
 ];
 
-pub(super) static MONITOR_ROWS: [InfoRow; 5] = [
+pub(super) static MONITOR_ROWS: [InfoRow; 8] = [
     InfoRow {
         name: "运行时间",
         value: &UPTIME,
@@ -349,6 +380,18 @@ pub(super) static MONITOR_ROWS: [InfoRow; 5] = [
     InfoRow {
         name: "亮度控制",
         value: &BRIGHTNESS_STATE,
+    },
+    InfoRow {
+        name: "空闲",
+        value: &IDLE_TEXT,
+    },
+    InfoRow {
+        name: "电源阶段",
+        value: &PHASE_TEXT,
+    },
+    InfoRow {
+        name: "脏页",
+        value: &DIRTY_TEXT,
     },
 ];
 
@@ -396,15 +439,21 @@ pub(super) static ABOUT_ROWS: [InfoRow; 10] = [
 ];
 
 pub(super) static INT_BINDINGS: [&IntBinding; 2] = [&INT_BRIGHTNESS, &INT_INTERVAL];
-pub(super) static BOOL_BINDINGS: [&BoolBinding; 3] =
-    [&BOOL_SWITCH, &BOOL_SHOW_ITEM, &BOOL_DISABLE_ITEM];
+pub(super) static BOOL_BINDINGS: [&BoolBinding; 4] = [
+    &BOOL_SWITCH,
+    &BOOL_SHOW_ITEM,
+    &BOOL_DISABLE_ITEM,
+    &BOOL_FADE,
+];
 pub(super) static CONFIRM_DESCS: [&ConfirmDesc; 1] = [&CONFIRM_RESET];
 pub(super) static LINE_INPUTS: [&LineInputBinding; 1] = [&LINE_INPUT_DEVICE];
 
 pub(super) static WAVE: Wave = Wave::new();
 pub(super) static MATH: MathPage = MathPage::new();
+pub(super) static ICONS: Icons = Icons::new();
+pub(super) static GADGETS: Gadgets = Gadgets::new();
 
-pub(super) static ROUTES: [&PageRoute; 8] = [
+pub(super) static ROUTES: [&PageRoute; 10] = [
     &ROUTE_HOME,
     &ROUTE_SETTINGS,
     &ROUTE_MONITOR,
@@ -413,6 +462,8 @@ pub(super) static ROUTES: [&PageRoute; 8] = [
     &ROUTE_COMPONENTS,
     &ROUTE_CONTROLS,
     &ROUTE_MATH,
+    &ROUTE_ICONS,
+    &ROUTE_GADGETS,
 ];
 
 /// 整个应用描述表。

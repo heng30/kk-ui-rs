@@ -4,10 +4,10 @@
 //! [`Runtime`] 加 `impl` 块。
 
 use super::input::KeyState;
-use super::nav::{self, PageTransition};
+use super::nav::{self, PageTransition, TransitionKind};
 use super::{
     BitsAnimation, ChipAnimation, Deferred, DeferredType, EVENT_QUEUE_LENGTH, ErrorInfo,
-    HomeAnimation, ListAnimation, MarqueeState, PageState, Status,
+    HomeAnimation, ListAnimation, MarqueeState, MenuRoll, PAGE_HASH_MAX, PageState, Status,
 };
 use crate::gfx::Frame;
 use crate::model::{
@@ -29,6 +29,8 @@ pub struct Runtime<'a> {
     pub(super) stack: [PageState; nav::NAV_DEPTH],
     /// 页面切换动画。
     pub(super) transition: PageTransition,
+    /// 之后导航使用的转场效果。
+    pub(super) transition_kind: TransitionKind,
     /// 首页横向动画。
     pub(crate) home_anim: HomeAnimation,
     /// 列表滚动与焦点动画。
@@ -39,6 +41,8 @@ pub struct Runtime<'a> {
     pub(crate) bits: BitsAnimation,
     /// 跑马灯。
     pub(crate) marquee: MarqueeState,
+    /// 菜单右列取值的滚动数字。
+    pub(crate) menu_roll: MenuRoll,
     /// 上一次刷新到这次刷新的间隔（毫秒），弹簧按它积分。
     pub(crate) dt_ms: i32,
     /// 覆盖层状态。
@@ -59,6 +63,11 @@ pub struct Runtime<'a> {
     pub(super) error: ErrorInfo,
     /// 最近一次 [`KkUi::update`] 的时戳。
     pub(crate) last_update: u32,
+    /// 最近一次有按键或编码器动作的时戳。
+    pub(crate) last_input: u32,
+    /// 变暗与息屏的两个阀值（毫秒），为 0 表示对应阶段不启用。
+    pub(crate) dim_after_ms: u32,
+    pub(crate) sleep_after_ms: u32,
     /// 下一帧最早可出帧的时刻。
     pub(super) next_frame: u32,
     /// 导航栈内页面数。
@@ -82,6 +91,12 @@ pub struct Runtime<'a> {
     /// 待通知的自绘页进入/离开事件，由 [`KkUi`] 在安全时机送进回调。
     pub(super) enter_custom: Option<&'static PageRoute>,
     pub(super) leave_custom: Option<&'static PageRoute>,
+    /// 上一帧每页的哈希，用于只提交变化的页。
+    pub(super) page_hashes: [u32; PAGE_HASH_MAX],
+    /// 上一次哈希是否有效；初始化后第一次计算时置为假，强制全刷。
+    pub(super) page_hashes_valid: bool,
+    /// 最近一次计算出的变化页位掩码，`take_dirty_pages` 取走后清零。
+    pub(super) dirty_pages: u32,
 }
 
 impl<'a> Runtime<'a> {
@@ -93,11 +108,13 @@ impl<'a> Runtime<'a> {
             current: PageState::default(),
             stack: [PageState::default(); nav::NAV_DEPTH],
             transition: PageTransition::default(),
+            transition_kind: TransitionKind::Slide,
             home_anim: HomeAnimation::default(),
             list_anim: ListAnimation::default(),
             chip: ChipAnimation::EMPTY,
             bits: BitsAnimation::EMPTY,
             marquee: MarqueeState::EMPTY,
+            menu_roll: MenuRoll::EMPTY,
             dt_ms: 0,
             overlay: Overlay::EMPTY,
             toast: Toast {
@@ -125,6 +142,9 @@ impl<'a> Runtime<'a> {
                 index: 0,
             },
             last_update: 0,
+            last_input: 0,
+            dim_after_ms: 0,
+            sleep_after_ms: 0,
             next_frame: 0,
             stack_count: 0,
             initialized: false,
@@ -137,12 +157,44 @@ impl<'a> Runtime<'a> {
             blocked_keys: 0,
             enter_custom: None,
             leave_custom: None,
+            page_hashes: [0; PAGE_HASH_MAX],
+            page_hashes_valid: false,
+            dirty_pages: 0,
         }
     }
 
     /// 当前画布。
     pub fn frame(&self) -> &Frame<'_> {
         &self.frame
+    }
+
+    /// 重算每页哈希，把变化的页并进 `dirty_pages`。
+    ///
+    /// 页数超过 [`PAGE_HASH_MAX`] 时放弃跟踪，调用方拿到全 1 掩码自己整帧提交。
+    pub(super) fn refresh_page_hashes(&mut self) {
+        let pages = self.frame.pages();
+        if pages > PAGE_HASH_MAX {
+            self.page_hashes_valid = false;
+            return;
+        }
+        let mut mask = 0u32;
+        for page in 0..pages {
+            let hash = self.frame.page_hash(page);
+            if !self.page_hashes_valid || self.page_hashes[page] != hash {
+                mask |= 1 << page;
+            }
+            self.page_hashes[page] = hash;
+        }
+        self.page_hashes_valid = true;
+        self.dirty_pages |= mask;
+    }
+
+    /// 取走变化页掩码，`bit n` 对应第 `n` 页（每页 8 行）。
+    pub(super) fn take_dirty_pages(&mut self) -> u32 {
+        if self.frame.pages() > PAGE_HASH_MAX {
+            return u32::MAX;
+        }
+        core::mem::take(&mut self.dirty_pages)
     }
 
     /// 当前画布（可变），供自绘页绘制。
@@ -177,11 +229,14 @@ impl<'a> Runtime<'a> {
         self.chip = ChipAnimation::EMPTY;
         self.bits = BitsAnimation::EMPTY;
         self.marquee = MarqueeState::EMPTY;
+        self.menu_roll = MenuRoll::EMPTY;
         self.overlay = Overlay::EMPTY;
         self.toast.visible = false;
         self.toast.closing = false;
         self.blocked_keys = 0;
         self.reject_flash = 0;
+        self.page_hashes_valid = false;
+        self.dirty_pages = 0;
         self.initialized = true;
         self.dirty = true;
         if self.current_page_type() == PageType::Custom {

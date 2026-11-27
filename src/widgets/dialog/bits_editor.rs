@@ -58,6 +58,7 @@ pub(crate) fn edit(rt: &mut Runtime, event: InputEvent, now: u32) {
         InputAction::Down if cursor + 1 >= count => leave(rt, DialogFocus::Confirm, now),
         InputAction::Up => move_cursor(rt, -steps, now),
         InputAction::Down => move_cursor(rt, steps, now),
+        InputAction::Back => {} // 返回已在 `dialog::input` 拦截，不会走到这里。
     }
 }
 

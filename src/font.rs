@@ -132,3 +132,19 @@ pub(crate) fn text_width(text: &str) -> u16 {
         None => 0,
     }
 }
+
+/// 按当前字体计算单个字符的步进宽度；缺字按全角计，无字体时为 0。
+pub(crate) fn char_width(c: char) -> u16 {
+    match current() {
+        Some(glyphs) => glyphs.width(c).unwrap_or(FULL_WIDTH) as u16,
+        None => 0,
+    }
+}
+
+/// 按当前字体绘制单个字符，返回步进宽度；无字体时为 0。
+pub(crate) fn draw_char(frame: &mut Frame<'_>, x: i16, y: i16, c: char) -> i16 {
+    match current() {
+        Some(glyphs) => glyphs.draw_char(frame, x, y, c).unwrap_or(FULL_WIDTH),
+        None => 0,
+    }
+}

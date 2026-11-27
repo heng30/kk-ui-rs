@@ -18,8 +18,9 @@ mod toast;
 use crate::gfx::{DrawMode, Frame};
 use crate::model::{EVENT_NONE, EventId, InputAction, InputEvent, MAX_BITS, PageType};
 use crate::ui::{
-    BOOL_VALUE_MS, DIALOG_CLOSE_MS, DIALOG_OPEN_MS, FOCUS_MS, INT_VALUE_MS, MENU_HEADER_HEIGHT,
-    Q12_ONE, Runtime, SPRING_BOUNCY, Status, ease_q12, lerp_q12, round_q8,
+    BOOL_VALUE_MS, Curve, DIALOG_CLOSE_MS, DIALOG_OPEN_MS, FOCUS_MS, INT_VALUE_MS,
+    MENU_HEADER_HEIGHT, Q12_ONE, Runtime, SPRING_BOUNCY, Status, curve_q12, ease_q12, lerp_q12,
+    round_q8,
 };
 use crate::widgets::utils;
 
@@ -317,10 +318,33 @@ pub(crate) fn draw_buttons(rt: &mut Runtime<'_>, layout: &Layout, cancel: bool) 
 }
 
 /// 处理输入。
+///
+/// 返回键在弹窗里一律等同取消：确认框跳到取消并执行，其余直接关闭不提交。
 pub(crate) fn input(rt: &mut Runtime, event: InputEvent, now: u32) {
     if !dialog_active(rt) || rt.overlay.closing {
         return;
     }
+
+    if event.action == InputAction::Back {
+        match rt.overlay.kind {
+            // 加载弹窗只能由应用关闭，返回键也不响应。
+            OverlayType::Loading | OverlayType::None => {}
+            OverlayType::Confirm => {
+                set_focus(rt, DialogFocus::Cancel, now);
+                confirm::input(
+                    rt,
+                    InputEvent {
+                        action: InputAction::Ok,
+                        ..event
+                    },
+                    now,
+                );
+            }
+            _ => close(rt, now),
+        }
+        return;
+    }
+
     match rt.overlay.kind {
         OverlayType::Message => message::input(rt, event, now),
         OverlayType::Confirm => confirm::input(rt, event, now),
@@ -401,7 +425,7 @@ pub(crate) fn animate(rt: &mut Runtime, now: u32) {
         let elapsed = now.wrapping_sub(rt.overlay.phase_started);
         let mut redraw = false;
         if rt.overlay.closing {
-            let p = ease_q12(elapsed, DIALOG_CLOSE_MS);
+            let p = curve_q12(Curve::Accel, elapsed, DIALOG_CLOSE_MS);
             rt.overlay.phase_q12 = lerp_q12(rt.overlay.phase_from_q12 as i32, 0, p) as u16;
             redraw = true;
             if p == Q12_ONE {
@@ -409,7 +433,7 @@ pub(crate) fn animate(rt: &mut Runtime, now: u32) {
                 rt.overlay.closing = false;
             }
         } else if rt.overlay.phase_q12 < Q12_ONE {
-            rt.overlay.phase_q12 = ease_q12(elapsed, DIALOG_OPEN_MS);
+            rt.overlay.phase_q12 = curve_q12(Curve::Decel, elapsed, DIALOG_OPEN_MS);
             redraw = true;
         }
         if rt.overlay.focus_moving {

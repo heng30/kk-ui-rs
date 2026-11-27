@@ -201,6 +201,7 @@ pub(crate) fn input(rt: &mut Runtime, event: InputEvent, now: u32) {
         InputAction::Ok => press(rt, now),
         InputAction::Up => move_cursor(rt, -steps),
         InputAction::Down => move_cursor(rt, steps),
+        InputAction::Back => {} // 返回已在 `dialog::input` 拦截，不会走到这里。
     }
 }
 

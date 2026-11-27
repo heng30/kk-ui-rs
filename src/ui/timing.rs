@@ -8,6 +8,8 @@ use super::SpringPreset;
 pub(crate) const KEY_DEBOUNCE_MS: u32 = 20;
 /// 长按重复的首次延迟。
 pub(crate) const KEY_REPEAT_DELAY_MS: u32 = 450;
+/// 确定键按住多久算「返回」：短按确认，超过阈值后松开就是返回。
+pub(crate) const KEY_OK_LONG_MS: u32 = 400;
 /// 最小出帧间隔。
 pub(crate) const FRAME_INTERVAL_MS: u32 = 20;
 /// 首页切换动画时长。
@@ -44,6 +46,10 @@ pub(crate) const ROW_GAP: i16 = 2;
 pub(crate) const ROW_PITCH: i16 = ROW_HEIGHT + ROW_GAP;
 /// 页面切换时旧页面的视差位移。
 pub(crate) const PAGE_PARALLAX: i16 = 32;
+/// 页哈希最多跟踪的页数；超过这个高度的画布退回「整帧提交」。
+///
+/// shortcut: 上限 32 页（256 像素高），用在更高的屏上要改成动态存储。
+pub(crate) const PAGE_HASH_MAX: usize = 32;
 
 /// 弹簧积分的固定子步长（毫秒）。
 pub(crate) const SPRING_SUBSTEP_MS: i32 = 8;

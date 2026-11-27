@@ -9,7 +9,7 @@ use crate::ui::{
     MENU_HEADER_HEIGHT, MENU_MS, PageState, ROW_HEIGHT, ROW_PITCH, Runtime, SPRING_CHIP, Status,
     ease_q12, lerp_q12,
 };
-use crate::widgets::{chip, dialog, marquee, toggle, utils};
+use crate::widgets::{Scrollbar, chip, dialog, marquee, toggle, utils};
 
 /// 菜单内容区能完整显示的行数，屏越高行越多，至少一行。
 fn visible_rows(rt: &Runtime) -> u16 {
@@ -370,6 +370,7 @@ pub(crate) fn menu_input(rt: &mut Runtime, event: InputEvent, now: u32) {
         InputAction::Ok => menu_activate(rt, now),
         InputAction::Up => menu_move(rt, -1, event.steps, now),
         InputAction::Down => menu_move(rt, 1, event.steps, now),
+        InputAction::Back => _ = rt.navigate_back(now),
     }
 }
 
@@ -573,7 +574,24 @@ pub(crate) fn menu_draw(
             } else {
                 screen_width - 22
             };
-            let value_x = right - rt.frame.text_width(value) as i16 + x_offset;
+            // 只有焦点行的取值逐位滚动，其它行直接画。
+            if focused {
+                if rt.menu_roll.row != item_index {
+                    rt.menu_roll.row = item_index;
+                    rt.menu_roll.roll.reset(value, rt.last_update);
+                } else {
+                    rt.menu_roll.roll.set(value, 1, rt.last_update);
+                }
+                if rt.menu_roll.roll.busy(rt.last_update) {
+                    rt.dirty = true;
+                }
+            }
+            let value_width = if focused {
+                rt.menu_roll.roll.width() as i16
+            } else {
+                rt.frame.text_width(value) as i16
+            };
+            let value_x = right - value_width + x_offset;
             menu_content_clip(
                 rt,
                 8 + x_offset,
@@ -593,7 +611,13 @@ pub(crate) fn menu_draw(
             );
             rt.frame
                 .set_clip(clip_x, MENU_HEADER_HEIGHT, clip_width, content_height);
-            rt.frame.draw_text(value_x, y, value);
+            if focused {
+                rt.menu_roll
+                    .roll
+                    .draw(&mut rt.frame, value_x, y, rt.last_update);
+            } else {
+                rt.frame.draw_text(value_x, y, value);
+            }
         } else if matches!(item.action, MenuAction::Page(_)) {
             menu_content_clip(
                 rt,
@@ -654,19 +678,22 @@ pub(crate) fn menu_draw(
         3,
     );
     rt.frame.set_draw_mode(DrawMode::Set);
-    let track = content_height;
     if visible_count > rows
         && x_offset + screen_width - 4 < clip_right
         && x_offset + screen_width > clip_x
     {
-        let first = ((scroll / 256) / ROW_PITCH as i32) as u16;
-        let thumb_height = track * rows / visible_count;
-        let maximum_first = visible_count - rows;
-        let thumb_y = MENU_HEADER_HEIGHT + ((track - thumb_height) * first / maximum_first) as i16;
-        rt.frame
-            .draw_vline(screen_width - 3 + x_offset, MENU_HEADER_HEIGHT, track);
-        rt.frame
-            .draw_box(screen_width - 4 + x_offset, thumb_y, 3, thumb_height);
+        Scrollbar {
+            x: screen_width - 4 + x_offset,
+            y: MENU_HEADER_HEIGHT,
+            track: content_height as i16,
+            scroll: scroll / 256,
+            content: visible_count as i32 * ROW_PITCH as i32,
+            viewport: rows as i16 * ROW_PITCH,
+            thickness: 3,
+            min_thumb: 1,
+            line: true,
+        }
+        .draw(&mut rt.frame);
     }
     rt.frame.reset_clip();
 }

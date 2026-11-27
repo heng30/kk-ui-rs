@@ -3,19 +3,7 @@
 use super::OverlayType;
 use crate::model::EVENT_NONE;
 use crate::ui::{Runtime, Status};
-use crate::widgets::utils;
-
-/// 指示器的 8 个点相对圆心的偏移，半径 10，自顶部起顺时针。
-const SPINNER: [(i8, i8); 8] = [
-    (0, -10),
-    (7, -7),
-    (10, 0),
-    (7, 7),
-    (0, 10),
-    (-7, 7),
-    (-10, 0),
-    (-7, -7),
-];
+use crate::widgets::{draw_spinner, utils};
 
 /// 指示器在每个点上停留的毫秒数，8 点转一圈约 1 秒。
 const STEP_MS: u32 = 120;
@@ -39,13 +27,8 @@ pub(crate) fn draw(rt: &mut Runtime<'_>, layout: &super::Layout) {
         .last_update
         .wrapping_sub(rt.overlay.phase_started)
         .wrapping_div(STEP_MS)
-        % SPINNER.len() as u32;
-    for (index, (x, y)) in SPINNER.iter().enumerate() {
-        let (x, y) = (cx + *x as i16, cy + *y as i16);
-        // 当前点画大一号，单色屏上才分得出指示器在转。
-        let radius = if index as u32 == step { 2 } else { 1 };
-        rt.frame.draw_disc(x, y, radius);
-    }
+        % 8;
+    draw_spinner(&mut rt.frame, cx, cy, 10, step as u8);
     utils::draw_centered(
         &mut rt.frame,
         layout.dx,

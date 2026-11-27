@@ -113,6 +113,7 @@ pub(crate) fn home_input(rt: &mut Runtime, event: InputEvent, now: u32) {
         }
         InputAction::Up => home_move(rt, -1, event.steps, now),
         InputAction::Down => home_move(rt, 1, event.steps, now),
+        InputAction::Back => {} // 首页是根页面，没有更上一层可退。
     }
 }
 

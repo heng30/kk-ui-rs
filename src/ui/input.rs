@@ -1,6 +1,6 @@
 //! 按键消抖、长按重复与编码器归一化。
 
-use super::{KEY_DEBOUNCE_MS, KEY_REPEAT_DELAY_MS, KkUi};
+use super::{KEY_DEBOUNCE_MS, KEY_OK_LONG_MS, KEY_REPEAT_DELAY_MS, KkUi};
 use crate::model::{
     Input, InputAction, InputEvent, InputSource, KEY_DOWN, KEY_OK, KEY_UP, PageType,
 };
@@ -9,6 +9,8 @@ use crate::widgets::pages;
 
 /// 需要消抖的按键数，下标对应键位。
 const KEY_COUNT: usize = 3;
+/// 确定键在按键位里的下标。
+const OK_INDEX: usize = 2;
 
 /// 单个按键的消抖与重复状态。
 #[derive(Clone, Copy, Default)]
@@ -25,6 +27,8 @@ pub(super) struct KeyState {
     pub(super) stable: bool,
     /// 本次按下是否还未被消费。
     pub(super) armed: bool,
+    /// 确定键按下后等松开再判定；其它键不使用。
+    pub(super) ok_pending: bool,
 }
 
 /// 长按重复的间隔：按已按住时间分三档。
@@ -43,8 +47,14 @@ impl KkUi<'_> {
     #[allow(clippy::needless_range_loop)]
     pub(super) fn process_input(&mut self, now: u32, input: Input) {
         let mut press = 0u8;
+        let mut release = 0u8;
         let mut repeat = 0u8;
         let keys = input.keys & (KEY_UP | KEY_DOWN | KEY_OK);
+        // 任何按键或编码器动作都算「还在用」，自动变暗与息屏由此计时。
+        if keys != 0 || input.encoder_delta != 0 || !self.rt.keys_initialized {
+            self.rt.last_input = now;
+        }
+        let transition_active = self.rt.transition.active;
         if !self.rt.keys_initialized {
             for index in 0..KEY_COUNT {
                 let down = keys & (1 << index) != 0;
@@ -55,6 +65,7 @@ impl KkUi<'_> {
                 key.candidate = down;
                 key.stable = down;
                 key.armed = !down;
+                key.ok_pending = false;
             }
             self.rt.keys_initialized = true;
         } else {
@@ -71,10 +82,16 @@ impl KkUi<'_> {
                     key.stable = key.candidate;
                     if !key.stable {
                         key.armed = true;
+                        release |= 1 << index;
                     } else if key.armed {
                         key.pressed_at = now;
                         key.repeat_at = now.wrapping_add(KEY_REPEAT_DELAY_MS);
-                        press |= 1 << index;
+                        // 确定键等松开时再判定短按还是长按。
+                        if index == OK_INDEX {
+                            key.ok_pending = !transition_active;
+                        } else {
+                            press |= 1 << index;
+                        }
                     }
                 }
                 // 只有上下键支持长按重复。
@@ -100,6 +117,7 @@ impl KkUi<'_> {
         self.rt.blocked_keys &= stable;
         if self.rt.transition.active {
             self.rt.blocked_keys |= stable;
+            self.rt.keys[OK_INDEX].ok_pending = false;
             return;
         }
         press &= !self.rt.blocked_keys;
@@ -110,10 +128,21 @@ impl KkUi<'_> {
             source: InputSource::Press,
             steps: 1,
         };
-        if press & KEY_OK != 0 {
-            event.action = InputAction::Ok;
-            self.dispatch_input(event, now);
-            return;
+        // 确定键在松开时结算：短按确认，按住超过阈值就是返回。
+        if release & KEY_OK != 0 {
+            let key = &mut self.rt.keys[OK_INDEX];
+            let pending = key.ok_pending;
+            key.ok_pending = false;
+            if pending {
+                let held = now.wrapping_sub(key.pressed_at);
+                event.action = if held >= KEY_OK_LONG_MS {
+                    InputAction::Back
+                } else {
+                    InputAction::Ok
+                };
+                self.dispatch_input(event, now);
+                return;
+            }
         }
         if input.encoder_delta != 0 {
             let delta = input.encoder_delta as i32;

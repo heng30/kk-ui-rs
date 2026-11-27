@@ -1,10 +1,9 @@
-//! 整数编辑器弹窗：草稿值按步长增减，新旧值纵向滚动切换。
+//! 整数编辑器弹窗：草稿值按步长增减，取值逐位滚动。
 
-use super::{Overlay, OverlayType, Row};
-use crate::gfx::Frame;
+use super::{OverlayType, Row};
 use crate::model::{EVENT_NONE, InputAction, InputEvent, IntBinding};
-use crate::ui::{Q12_ONE, Runtime, Status};
-use crate::widgets::utils::{BUFFER_LEN, draw_centered, format_int};
+use crate::ui::{Runtime, Status};
+use crate::widgets::utils::{BUFFER_LEN, format_int};
 
 /// 取覆盖层里的整数绑定。
 fn binding(rt: &Runtime) -> &'static IntBinding {
@@ -63,10 +62,9 @@ pub(crate) fn commit(rt: &mut Runtime, now: u32) {
 
 /// 绘制标题、取值与按钮；编辑态额外画上下箭头。
 pub(crate) fn draw(rt: &mut Runtime<'_>, layout: &super::Layout) {
-    let overlay = rt.overlay;
     let entry = binding(rt);
     super::draw_title(rt, layout, entry.title);
-    draw_value(&overlay, entry.unit, &mut rt.frame, layout.dx, layout.dy);
+    draw_value(rt, entry.unit, layout);
     super::draw_buttons(rt, layout, true);
     if rt.overlay.editing {
         let (dx, dy) = (layout.dx, layout.dy);
@@ -81,23 +79,20 @@ pub(crate) fn draw(rt: &mut Runtime<'_>, layout: &super::Layout) {
     }
 }
 
-/// 整数编辑器：新旧值纵向滚动切换。
-fn draw_value(overlay: &Overlay, unit: &str, frame: &mut Frame<'_>, dx: i16, dy: i16) {
-    let mut old_text = [0u8; BUFFER_LEN];
-    let mut new_text = [0u8; BUFFER_LEN];
-    let previous = format_int(overlay.previous, unit, &mut old_text);
-    let draft = format_int(overlay.draft, unit, &mut new_text);
-    frame.set_clip(39 + dx, 21 + dy, 46, 16);
-    if overlay.value_moving {
-        let offset = (16 * overlay.value_q12 as i32 / Q12_ONE as i32) as i16;
-        if overlay.value_direction > 0 {
-            draw_centered(frame, 39 + dx, 21 + dy - offset, 46, previous);
-            draw_centered(frame, 39 + dx, 37 + dy - offset, 46, draft);
-        } else {
-            draw_centered(frame, 39 + dx, 21 + dy + offset, 46, previous);
-            draw_centered(frame, 39 + dx, 5 + dy + offset, 46, draft);
-        }
+/// 整数编辑器：取值逐位滚动，单位跟着数字一起滚。
+fn draw_value(rt: &mut Runtime<'_>, unit: &str, layout: &super::Layout) {
+    let mut buffer = [0u8; BUFFER_LEN];
+    let text = format_int(rt.overlay.draft, unit, &mut buffer);
+    let dir = if rt.overlay.value_direction < 0 {
+        -1
     } else {
-        draw_centered(frame, 39 + dx, 21 + dy, 46, draft);
-    }
+        1
+    };
+    rt.overlay.roll.set(text, dir, rt.last_update);
+    let width = rt.overlay.roll.width() as i16;
+    let x = 39 + layout.dx + (46 - width) / 2;
+    rt.frame.set_clip(39 + layout.dx, 21 + layout.dy, 46, 16);
+    rt.overlay
+        .roll
+        .draw(&mut rt.frame, x, 21 + layout.dy, rt.last_update);
 }

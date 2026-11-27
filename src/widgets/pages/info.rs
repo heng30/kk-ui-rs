@@ -5,7 +5,7 @@ use crate::model::{InfoPage, InputAction, InputEvent, PageRoute, PageType};
 use crate::ui::{
     INFO_HEADER_HEIGHT, INFO_SCROLL_MS, PageState, ROW_PITCH, Runtime, ease_q12, lerp_q12, round_q8,
 };
-use crate::widgets::utils;
+use crate::widgets::{Scrollbar, utils};
 
 /// 取当前页面对应的信息页。
 fn info_page(state: &PageState) -> &'static InfoPage {
@@ -98,6 +98,7 @@ pub(crate) fn info_input(rt: &mut Runtime, event: InputEvent, now: u32) {
         }
         InputAction::Up => info_move(rt, -1, event.steps, now),
         InputAction::Down => info_move(rt, 1, event.steps, now),
+        InputAction::Back => _ = rt.navigate_back(now),
     }
 }
 
@@ -194,18 +195,18 @@ pub(crate) fn info_draw(
         && x_offset + screen_width > clip_x
         && x_offset + screen_width - 2 < clip_right
     {
-        let viewport = screen_height - header;
-        let mut thumb_height = (viewport as u32 * viewport as u32
-            / (page.rows.len() as u32 * ROW_PITCH as u32)) as i16;
-        if thumb_height < 8 {
-            thumb_height = 8;
+        Scrollbar {
+            x: screen_width - 2 + x_offset,
+            y: header,
+            track: screen_height - header,
+            scroll: round_q8(scroll) as i32,
+            content: page.rows.len() as i32 * ROW_PITCH as i32,
+            viewport: screen_height - header,
+            thickness: 2,
+            min_thumb: 8,
+            line: false,
         }
-        let maximum = info_max_scroll_q8(rt, page) / 256;
-        let scroll_pixels = round_q8(scroll) as i32;
-        let thumb_y =
-            header + ((viewport as i32 - thumb_height as i32) * scroll_pixels / maximum) as i16;
-        rt.frame
-            .draw_box(screen_width - 2 + x_offset, thumb_y, 2, thumb_height as u16);
+        .draw(&mut rt.frame);
     }
     rt.frame.reset_clip();
 }

@@ -34,8 +34,11 @@ pub use model::{
     IntBinding, ItemState, KEY_DOWN, KEY_OK, KEY_UP, LINE_INPUT_LEN, LineInput, LineInputBinding,
     MAX_BITS, MenuAction, MenuItem, MenuPage, PageRoute, PageType, Shared, Text, Texts,
 };
-pub use ui::{CustomPageHandler, ErrorInfo, KkUi, Runtime, Status};
-pub use widgets::{draw_focus, draw_progress_bar, draw_switch, utils::format_int};
+pub use ui::{CustomPageHandler, ErrorInfo, KkUi, PowerPhase, Runtime, Status, TransitionKind};
+pub use widgets::{
+    Scrollbar, draw_battery, draw_chevron, draw_focus, draw_progress_bar, draw_spinner,
+    draw_switch, draw_wifi, utils::format_int,
+};
 
 /// 按声明顺序为事件生成从 1 开始的编号常量。
 ///

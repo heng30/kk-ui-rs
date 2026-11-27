@@ -2,6 +2,7 @@
 
 use super::Spring;
 use crate::model::PageRoute;
+use crate::widgets::roll::Roll;
 
 /// 单页的滚动与焦点状态。
 #[derive(Clone, Copy, Default)]
@@ -108,5 +109,25 @@ impl MarqueeState {
         row: u16::MAX,
         phase: 0,
         started: 0,
+    };
+}
+
+/// 菜单右列取值的滚动数字：只滚当前焦点行。
+///
+/// shortcut: 非焦点行的取值变化直接跳字，取值只在焦点行编辑，够用；
+/// 要支持背景行同时滚动，得改成按行存的数组。
+#[derive(Clone, Copy)]
+pub(crate) struct MenuRoll {
+    /// 这份状态对应的条目下标。
+    pub(crate) row: u16,
+    /// 滚动状态。
+    pub(crate) roll: Roll,
+}
+
+impl MenuRoll {
+    /// 静止状态。
+    pub(crate) const EMPTY: Self = Self {
+        row: u16::MAX,
+        roll: Roll::EMPTY,
     };
 }

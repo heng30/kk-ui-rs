@@ -18,6 +18,14 @@ pub enum DrawMode {
     Xor,
 }
 
+/// 4×4 有序抖动矩阵，值与 16 一起做阈值比较。
+const BAYER: [u8; 16] = [
+    0, 8, 2, 10, //
+    12, 4, 14, 6, //
+    3, 11, 1, 9, //
+    15, 7, 13, 5,
+];
+
 /// 单色画布与绘制状态。
 pub struct Frame<'a> {
     /// 帧缓冲，长度已按画布尺寸截断。
@@ -30,6 +38,10 @@ pub struct Frame<'a> {
     clip: (i16, i16, i16, i16),
     /// 后续图元的前景处理方式。
     mode: DrawMode,
+    /// 有序抖动阀值 0..=16；16 表示不抖动。
+    dither: u8,
+    /// 抖动是否取反（画阀值以上的像素）。
+    dither_invert: bool,
 }
 
 impl<'a> Frame<'a> {
@@ -45,6 +57,8 @@ impl<'a> Frame<'a> {
             height,
             clip: (0, 0, width, height),
             mode: DrawMode::Set,
+            dither: 16,
+            dither_invert: false,
         }
     }
 
@@ -66,6 +80,25 @@ impl<'a> Frame<'a> {
     /// 原始帧缓冲，供上层放大显示。
     pub fn buffer(&self) -> &[u8] {
         self.buf
+    }
+
+    /// 页数：每 8 行为一页，与 SSD1306 的页格式一致。
+    pub fn pages(&self) -> usize {
+        (self.height.max(0) as usize).div_ceil(8)
+    }
+
+    /// 第 `page` 页（8 行）的 FNV-1a 哈希；页号越界时返回 0。
+    pub fn page_hash(&self, page: usize) -> u32 {
+        let width = self.width.max(0) as usize;
+        let Some(bytes) = self.buf.get(page * width..(page + 1) * width) else {
+            return 0;
+        };
+        let mut hash = 0x811c_9dc5u32;
+        for &byte in bytes {
+            hash ^= byte as u32;
+            hash = hash.wrapping_mul(0x0100_0193);
+        }
+        hash
     }
 
     /// 把第 `y` 行按整数倍 `scale` 横向展开写进 `out`，亮像素取 `on`、灭像素取 `off`。
@@ -105,6 +138,20 @@ impl<'a> Frame<'a> {
         self.mode = mode;
     }
 
+    /// 设置有序抖动：`coverage` 为 0..=16 的有符号阀值，16 为不抖动。
+    ///
+    /// `invert` 为真时只画阀值以上的像素，两者互补即可做出渐变转场。
+    pub fn set_dither(&mut self, coverage: u8, invert: bool) {
+        self.dither = coverage.min(16);
+        self.dither_invert = invert;
+    }
+
+    /// 关闭抖动，后续图元全画。
+    pub fn reset_dither(&mut self) {
+        self.dither = 16;
+        self.dither_invert = false;
+    }
+
     /// 设置半开裁剪窗口；宽高超出 `i16` 表示范围时保持原窗口不变。
     pub fn set_clip(&mut self, x: i16, y: i16, width: u16, height: u16) {
         if width > i16::MAX as u16 || height > i16::MAX as u16 {
@@ -134,6 +181,14 @@ impl<'a> Frame<'a> {
         let (x0, y0, x1, y1) = self.clip;
         if x < x0 || x >= x1 || y < y0 || y >= y1 || !on {
             return;
+        }
+        if self.dither_invert || self.dither < 16 {
+            let threshold = BAYER[((y as usize & 3) << 2) | (x as usize & 3)];
+            let below = threshold < self.dither;
+            let draw = if self.dither_invert { !below } else { below };
+            if !draw {
+                return;
+            }
         }
         let index = x as usize + (y as usize >> 3) * self.width as usize;
         let mask = 1u8 << (y & 7);

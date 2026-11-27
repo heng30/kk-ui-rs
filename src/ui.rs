@@ -11,6 +11,7 @@ mod deferred;
 mod events;
 mod input;
 mod nav;
+mod power;
 mod runtime;
 mod scene;
 mod spring;
@@ -26,16 +27,19 @@ use crate::model::{
 };
 use crate::widgets::{dialog, pages};
 
-pub(crate) use anim::{ease_q12, lerp_q12, round_q8};
 pub use custom::CustomPageHandler;
+pub use nav::TransitionKind;
+pub use power::PowerPhase;
+pub use runtime::Runtime;
+pub use status::{ErrorInfo, Status};
+
+pub(crate) use anim::{Curve, curve_q12, ease_q12, lerp_q12, round_q8};
 pub(crate) use deferred::{Deferred, DeferredType};
 pub(crate) use events::EVENT_QUEUE_LENGTH;
-pub use runtime::Runtime;
 pub(crate) use spring::{Spring, SpringPreset};
 pub(crate) use state::{
-    BitsAnimation, ChipAnimation, HomeAnimation, ListAnimation, MarqueeState, PageState,
+    BitsAnimation, ChipAnimation, HomeAnimation, ListAnimation, MarqueeState, MenuRoll, PageState,
 };
-pub use status::{ErrorInfo, Status};
 pub(crate) use timing::*;
 
 /// UI 本体：运行时 + 应用描述表。自绘页实现挂在 [`App::routes`] 上。
@@ -91,6 +95,7 @@ impl<'a> KkUi<'a> {
                 .wrapping_add((missed + 1).wrapping_mul(FRAME_INTERVAL_MS));
             self.rt.dirty = false;
             self.draw_scene();
+            self.rt.refresh_page_hashes();
             self.rt.frame_ready = true;
         }
         Status::Ok
@@ -111,6 +116,13 @@ impl<'a> KkUi<'a> {
         let ready = self.rt.frame_ready;
         self.rt.frame_ready = false;
         ready
+    }
+
+    /// 取走自上次调用以来变化的页位掩码，`bit n` 对应第 `n` 页（每页 8 行）。
+    ///
+    /// 首次调用返回全部页；画布高过 [`PAGE_HASH_MAX`] 页时一律返回全 1，交给应用整帧提交。
+    pub fn take_dirty_pages(&mut self) -> u32 {
+        self.rt.take_dirty_pages()
     }
 
     /// 取走一个应用事件。
@@ -151,6 +163,21 @@ impl<'a> KkUi<'a> {
     /// 显示工作是否已经静止。
     pub fn is_display_idle(&self) -> bool {
         self.rt.is_display_idle()
+    }
+
+    /// 距最近一次按键或编码器动作过去了多少毫秒。
+    pub fn idle_ms(&self) -> u32 {
+        self.rt.idle_ms()
+    }
+
+    /// 按当前空闲时长判断屏幕应当处于的电源阶段。
+    pub fn power_phase(&self) -> PowerPhase {
+        self.rt.power_phase()
+    }
+
+    /// 设置变暗与息屏的空闲阀值（毫秒）；任一项为 0 表示该阶段不启用。
+    pub fn set_power_timeouts(&mut self, dim_after_ms: u32, sleep_after_ms: u32) {
+        self.rt.set_power_timeouts(dim_after_ms, sleep_after_ms);
     }
 
     /// 当前页面的选中条目下标；菜单页等于条目数时表示虚拟返回项。
@@ -216,5 +243,10 @@ impl<'a> KkUi<'a> {
     /// 返回上一页。
     pub fn navigate_back(&mut self, now: u32) -> Status {
         self.rt.navigate_back(now)
+    }
+
+    /// 设置之后的页面切换使用的转场效果。
+    pub fn set_transition_kind(&mut self, kind: TransitionKind) {
+        self.rt.transition_kind = kind;
     }
 }
