@@ -22,6 +22,7 @@
 | `src/ui.rs` | 门面：模块声明、再导出、`KkUi` 本体 |
 | `src/ui/*` | `Runtime` 按能力一个文件，各自给 `Runtime` 加 `impl`（见下） |
 | `src/widgets/*` | 复用组件；`pages/` 三个页面、`dialog/` 弹窗与 Toast |
+| `src/widgets/anim_icons.rs` | 动图类型、绘制与 1449 个静态（483 个动图 × 三档，`anim-icons` 特性，默认关）；数据在 `assets/icons/animators/`，文件末尾一次 `anim_icons!` 声明全部 |
 | `src/cjk.rs` | 内嵌字库（仅 `cjk-fonts`） |
 | `src/sim.rs` | 宿主机 eframe 模拟器（仅 `sim`，唯一用 `std` 的地方） |
 | `bin/kkui-tool.rs` | 资源工具：`font` 采字符生成字库、`icon` 图片转 XBM（仅 `tool`） |
@@ -59,7 +60,7 @@
   `f32` 只允许出现在 `src/sim.rs`（egui 侧）。
 - **批量声明走库内宏**：`event_ids!`（按声明顺序生成从 1 开始的事件号）、`shared!`、`texts!`、
   `menu_states!`（定长状态数组，长度由递归 `@len` 数出来）、`icons!`（`include_bytes!` 路径相对
-  调用该宏的文件解析）。不要在示例或测试里再手写等价的静态声明。
+  调用该宏的文件解析）、`anim_icons!`（`名字 = "文件名" @ 尺寸` 批量声明动图，路径靠 `CARGO_MANIFEST_DIR` 拼）。不要在示例或测试里再手写等价的静态声明。
 - **`enum` ↔ 字符串转换用 `strum`**：不要手写 `as_str` / `from_str`。注意本 crate 默认无外部依赖，
   引入 `strum` 前先确认是否愿意破这个前提。
 - **`assets/` 是内嵌资源的唯一真源**：改 `assets/fonts/unifont.bdf` 就等于改二进制。

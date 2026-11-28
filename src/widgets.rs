@@ -23,3 +23,9 @@ pub use icons::{draw_battery, draw_caret, draw_chevron, draw_spinner, draw_wifi}
 pub use progress_bar::draw_progress_bar;
 pub use scrollbar::Scrollbar;
 pub use switch::draw_switch;
+
+#[cfg(feature = "anim-icons")]
+pub mod anim_icons;
+
+#[cfg(feature = "anim-icons")]
+pub use anim_icons::{AnimIcon, IconSize, draw_anim_icon, draw_anim_icon_at};

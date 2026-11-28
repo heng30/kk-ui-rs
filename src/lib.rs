@@ -40,6 +40,9 @@ pub use widgets::{
     draw_switch, draw_wifi, utils::format_int,
 };
 
+#[cfg(feature = "anim-icons")]
+pub use widgets::{AnimIcon, IconSize, anim_icons, draw_anim_icon, draw_anim_icon_at};
+
 /// 按声明顺序为事件生成从 1 开始的编号常量。
 ///
 /// 只能写在模块作用域：生成的是 `pub const`。
@@ -140,5 +143,55 @@ macro_rules! icons {
             $(#[$attr])*
             pub static $name: &[u8] = include_bytes!($path);
         )*
+    };
+}
+
+/// 批量声明动图静态，写法是 `名字 = "文件名" @ 尺寸`，尺寸取 [`IconSize`] 的变体。
+///
+/// 每个静态只读一个尺寸的 `.bin`：`<调用方 crate 根>/assets/icons/animators/<文件名>.<边长>.bin`，
+/// 路径由 `env!("CARGO_MANIFEST_DIR")` 拼成，所以只对**调用方自己**的 `assets/` 有效。
+/// 需要 `anim-icons` 特性。
+///
+/// 只能写在模块作用域：生成的是 `pub static`。
+///
+/// ```ignore
+/// kk_ui::anim_icons! {
+///     /// 32×32 的转圈。
+///     SPINNER_32 = "spinner" @ Px32,
+///     /// 64×64 的火箭。
+///     ROCKET_64 = "rocket" @ Px64,
+/// }
+/// ```
+#[cfg(feature = "anim-icons")]
+#[macro_export]
+macro_rules! anim_icons {
+    ($($(#[$attr:meta])* $name:ident = $file:literal @ $size:ident),* $(,)?) => {
+        $(
+            $crate::anim_icons!(@declare $(#[$attr])* $name, $file, $size);
+        )*
+    };
+    (@declare $(#[$attr:meta])* $name:ident, $file:literal, Px32) => {
+        $crate::anim_icons!(@static $(#[$attr])* $name, $file, Px32, "32");
+    };
+    (@declare $(#[$attr:meta])* $name:ident, $file:literal, Px48) => {
+        $crate::anim_icons!(@static $(#[$attr])* $name, $file, Px48, "48");
+    };
+    (@declare $(#[$attr:meta])* $name:ident, $file:literal, Px64) => {
+        $crate::anim_icons!(@static $(#[$attr])* $name, $file, Px64, "64");
+    };
+    (@static $(#[$attr:meta])* $name:ident, $file:literal, $size:ident, $px:literal) => {
+        $(#[$attr])*
+        #[doc = concat!("动图 `", $file, "`，", $px, "×", $px, "。")]
+        pub static $name: $crate::AnimIcon = $crate::AnimIcon {
+            size: $crate::IconSize::$size,
+            frames: include_bytes!(concat!(
+                env!("CARGO_MANIFEST_DIR"),
+                "/assets/icons/animators/",
+                $file,
+                ".",
+                $px,
+                ".bin"
+            )),
+        };
     };
 }

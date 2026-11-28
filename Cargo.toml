@@ -1,6 +1,6 @@
 [package]
 name = "kk-ui-rs"
-version = "0.3.0"
+version = "0.4.0"
 edition = "2024"
 license = "MIT"
 default-run = "kkui-tool"
@@ -21,6 +21,7 @@ required-features = ["sim"]
 
 [features]
 cjk-fonts = []
+anim-icons = []
 sim = ["dep:eframe", "dep:png"]
 tool = ["dep:clap", "dep:image", "dep:syn", "dep:proc-macro2"]
 
