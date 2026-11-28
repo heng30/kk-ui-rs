@@ -1,8 +1,8 @@
 # kk-ui-rs
 
 [KK_UI](https://gitee.com/keysking/kk_ui) 的 Rust 移植：单色菜单 UI 运行时。
-提供首页图标选择器、可嵌套菜单、只读信息页、应用自绘页、整数/开关编辑器、分段单选行、
-位掩码行、枚举选择弹窗、单行输入框（软键盘）、确认框、消息框与 Toast；画布尺寸由应用决定，
+提供首页图标选择器（静态 XBM 或动图）、可嵌套菜单、只读信息页、应用自绘页、整数/开关编辑器、
+分段单选行、位掩码行、枚举选择弹窗、单行输入框（软键盘）、确认框、消息框与 Toast；画布尺寸由应用决定，
 布局固定 16px 行高，屏越高菜单能显示的行越多。交互只有上/下/确定三个键：软键盘每行两端
 各有一个换行按钮，上下键在行内移动、确定踩按钮换行，光标停在原地可以连按同一个键；新组件的
 滑动与滚动用定点弹簧驱动。
@@ -52,26 +52,94 @@ use core::cell::Cell;
 
 static MY_PAGE: MyPage = MyPage::new();
 
-static ROUTES: [PageRoute; 1] = [PageRoute::Custom(&MY_PAGE)];
+static MY_ROUTE: PageRoute = PageRoute::Custom(&MY_PAGE);
+static ROUTES: [&PageRoute; 1] = [&MY_ROUTE];
 
 static MY_APP: App = App {
-    root_page: 1,
+    root_page: &MY_ROUTE,
     routes: &ROUTES,
     // ...
 };
 
 impl CustomPageHandler for MyPage {
     // 回调只拿 `&self`，可变状态放 `Cell`/`Shared` 里。
-    fn on_enter(&self, ui: &mut Runtime, page: PageId) {}
-    fn on_input(&self, ui: &mut Runtime, page: PageId, event: InputEvent) {}
-    fn on_tick(&self, ui: &mut Runtime, page: PageId, now: u32) -> bool { false }
-    fn on_draw(&self, ui: &mut Runtime, page: PageId, x: i16, clip_x: i16, clip_w: u16) {
+    fn on_enter(&self, ui: &mut Runtime, page: &'static PageRoute) {}
+    fn on_input(&self, ui: &mut Runtime, page: &'static PageRoute, event: InputEvent) {}
+    fn on_tick(&self, ui: &mut Runtime, page: &'static PageRoute, now: u32) -> bool { false }
+    fn on_draw(&self, ui: &mut Runtime, page: &'static PageRoute, x_offset: i16, clip_x: i16, clip_width: u16) {
         let frame = ui.frame_mut();
         let (width, height) = (frame.width(), frame.height());
         // frame.draw_text / draw_rbox / ...
     }
 }
 ```
+
+## 动图与静态图标
+
+### 动图（`anim-icons`，默认关）
+
+483 个 icons8 动图，每个备 32 / 48 / 64 三档；**每档一个独立静态**，只引用哪一档就只链入
+哪一档的字节（一个动图 28 帧）：
+
+| 档位 | 静态名 | 单帧 | 整个动图 |
+|---|---|---|---|
+| 32×32 | `ACTIVITY_32` | 128 B | 3.5 KiB |
+| 48×48 | `ACTIVITY_48` | 288 B | 7.9 KiB |
+| 64×64 | `ACTIVITY_64` | 512 B | 14.0 KiB |
+
+```toml
+kk-ui-rs = { version = "0.4", features = ["anim-icons"] }
+```
+
+```rust
+use kk_ui::{anim_icons::ACTIVITY_64, draw_anim_icon, draw_anim_icon_at, Frame};
+
+// 第 12 帧，左上角 (8, 8)；尺寸取自静态自己，不用再传。
+draw_anim_icon(&mut frame, 8, 8, &ACTIVITY_64, 12);
+// 按经过的毫秒数取帧：24 fps 循环。
+draw_anim_icon_at(&mut frame, 8, 8, &ACTIVITY_64, elapsed_ms);
+```
+
+`AnimIcon { size: IconSize, frames: &'static [u8] }`：`IconSize` 是 `Px32` / `Px48` /
+`Px64`（`px()`、`frame_len()`、`ALL`），每帧 `size × size / 8` 字节，布局与 `Frame` 的
+缓冲一致，`frame_count()` 给帧数。未引用的动图不会进固件——实测空程序 435 KiB，多引一个
+32 档只多 3.5 KiB。
+
+自己的动图放 `<你的 crate>/assets/icons/animators/<文件名>.{32,48,64}.bin`，用宏声明
+（路径靠 `CARGO_MANIFEST_DIR` 拼，不写相对路径）：
+
+```rust
+kk_ui::anim_icons! {
+    /// 32×32 的转圈。
+    SPINNER_32 = "spinner" @ Px32,
+}
+```
+
+首页入口的图标同样可以是动图（同样要开 `anim-icons`），组件会按 24 fps 换帧重画整页；
+只有静态图标的首页不重画：
+
+```rust
+static HOME_ITEMS: [HomeItem; 1] = [HomeItem {
+    label: "动图",
+    icon: HomeIcon::Anim(&ACTIVITY_32), // 静态图标写 HomeIcon::Static(XBM)
+    target: &ROUTE_ANIMS,
+}];
+```
+
+### 静态图标
+
+库自带四张 32×32 XBM（`assets/icons/statics/`）：`ICON_SETTINGS`、`ICON_MONITOR`、
+`ICON_WAVE`、`ICON_ABOUT`，用 `Frame::draw_xbm(x, y, 32, 32, ICON_SETTINGS)` 画，或者直接
+塞进 `HomeIcon::Static(ICON_SETTINGS)`。自己的图标同理：
+
+```rust
+kk_ui::static_icons! {
+    /// 32×32 的齿轮。
+    ICON_GEAR = "gear",
+}
+```
+
+`.bin` 放 `<你的 crate>/assets/icons/statics/gear.bin`，用 `kkui-tool icon` 从图片生成。
 
 ## 字体：全局缓存 + 内嵌点阵（`cjk-fonts`）
 
@@ -176,4 +244,5 @@ kk_ui::sim::run(
 
 ## 许可证
 
-跟随上游 KK_UI，MIT。图标资源来自上游标准 Demo
+跟随上游 KK_UI，MIT。静态图标来自上游标准 Demo；动图由 icons8.com 的动画图标栅格化而来，
+免费使用时需在项目里署名 icons8.com。
