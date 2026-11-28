@@ -17,7 +17,7 @@ required-features = ["tool"]
 
 [[example]]
 name = "sim"
-required-features = ["sim"]
+required-features = ["sim", "anim-icons"]
 
 [features]
 cjk-fonts = []

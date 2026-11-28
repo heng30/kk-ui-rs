@@ -54,6 +54,9 @@ pub(crate) struct HomeAnimation {
     pub(crate) started: u32,
     /// 是否正在播放。
     pub(crate) active: bool,
+    /// 上次画到的动图帧序号，用来按 24 fps 标脏。
+    #[cfg(feature = "anim-icons")]
+    pub(crate) anim_frame: usize,
 }
 
 /// 分段选择行的滑动框状态。

@@ -38,7 +38,7 @@ static BOOL_VALUE: Shared<bool> = Shared::new(false);
 
 static HOME_ITEMS: [kk_ui::HomeItem; 1] = [kk_ui::HomeItem {
     label: "Menu",
-    icon: &ICON,
+    icon: kk_ui::HomeIcon::Static(&ICON),
     target: &ROUTE_MENU,
 }];
 

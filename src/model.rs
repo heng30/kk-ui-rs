@@ -309,12 +309,21 @@ impl PageRoute {
     }
 }
 
+/// 首页入口的图标。
+pub enum HomeIcon {
+    /// 32×32 XBM 静态图标。
+    Static(&'static [u8]),
+    /// 32 档动图，按 24 fps 循环。
+    #[cfg(feature = "anim-icons")]
+    Anim(&'static crate::widgets::AnimIcon),
+}
+
 /// 首页的一个图标入口。
 pub struct HomeItem {
     /// 文字标签。
     pub label: &'static str,
-    /// 32×32 XBM 图标。
-    pub icon: &'static [u8],
+    /// 32×32 图标：静态 XBM 或 32 档动图。
+    pub icon: HomeIcon,
     /// 选中后进入的页面。
     pub target: &'static PageRoute,
 }

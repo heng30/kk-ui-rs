@@ -86,10 +86,14 @@ pub fn draw_anim_icon(frame: &mut Frame<'_>, x: i16, y: i16, anim: &AnimIcon, in
     }
 }
 
+/// 24 fps 下 `elapsed_ms` 落在第几帧（还没对帧数取模）。
+pub fn frame_index(elapsed_ms: u32) -> usize {
+    (elapsed_ms as u64 * 24 / 1000) as usize
+}
+
 /// 按经过的毫秒数画动图：24 fps 循环播放，`elapsed_ms` 从动画开始时算起。
 pub fn draw_anim_icon_at(frame: &mut Frame<'_>, x: i16, y: i16, anim: &AnimIcon, elapsed_ms: u32) {
-    let index = (elapsed_ms as u64 * 24 / 1000) as usize;
-    draw_anim_icon(frame, x, y, anim, index);
+    draw_anim_icon(frame, x, y, anim, frame_index(elapsed_ms));
 }
 
 crate::anim_icons! {

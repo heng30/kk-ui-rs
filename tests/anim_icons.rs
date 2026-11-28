@@ -5,7 +5,10 @@
 #![cfg(feature = "anim-icons")]
 
 use kk_ui::anim_icons::{ACTIVITY_32, ACTIVITY_48, ACTIVITY_64};
-use kk_ui::{AnimIcon, Frame, IconSize, draw_anim_icon, draw_anim_icon_at};
+use kk_ui::{
+    AnimIcon, App, Frame, Glyphs, HomeIcon, HomeItem, HomePage, IconSize, Input, KkUi, MenuPage,
+    PageRoute, Status, Texts, draw_anim_icon, draw_anim_icon_at, set_font,
+};
 
 /// 动图某一帧的置位像素必须原样落到帧缓冲的对应坐标。
 #[test]
@@ -95,4 +98,133 @@ fn sizes_are_separate_statics() {
         assert_eq!(anim.frames.len(), anim.frame_count() * size.frame_len());
         assert_eq!(anim.frame_count(), ACTIVITY_32.frame_count());
     }
+}
+
+/// 单色静态图标（128 字节，32×32）。
+static STATIC_ICON: [u8; 128] = [0xaa; 128];
+
+/// 空字库：缺字，文字绘制为空但仍占位。
+static GLYPHS: Glyphs = Glyphs {
+    bitmaps: &[],
+    widths: &[],
+    codepoints: &[],
+};
+
+static TEXT_TARGET: PageRoute = PageRoute::Menu(&MenuPage {
+    title: "T",
+    items: &[],
+    states: None,
+});
+
+/// 首页入口：一个动图加一个静态图标。
+static MIXED_ITEMS: [HomeItem; 2] = [
+    HomeItem {
+        label: "A",
+        icon: HomeIcon::Anim(&ACTIVITY_32),
+        target: &TEXT_TARGET,
+    },
+    HomeItem {
+        label: "B",
+        icon: HomeIcon::Static(&STATIC_ICON),
+        target: &TEXT_TARGET,
+    },
+];
+
+/// 首页入口：只有静态图标。
+static STATIC_ITEMS: [HomeItem; 2] = [
+    HomeItem {
+        label: "A",
+        icon: HomeIcon::Static(&STATIC_ICON),
+        target: &TEXT_TARGET,
+    },
+    HomeItem {
+        label: "B",
+        icon: HomeIcon::Static(&STATIC_ICON),
+        target: &TEXT_TARGET,
+    },
+];
+
+static ROUTE_MIXED: PageRoute = PageRoute::Home(&HomePage {
+    items: &MIXED_ITEMS,
+});
+static ROUTE_STATIC: PageRoute = PageRoute::Home(&HomePage {
+    items: &STATIC_ITEMS,
+});
+
+static MIXED_APP: App = App {
+    root_page: &ROUTE_MIXED,
+    routes: &MIXED_ROUTES,
+    int_bindings: &[],
+    bool_bindings: &[],
+    confirm_descs: &[],
+    line_inputs: &[],
+    texts: TEXTS,
+};
+static STATIC_APP: App = App {
+    root_page: &ROUTE_STATIC,
+    routes: &STATIC_ROUTES,
+    int_bindings: &[],
+    bool_bindings: &[],
+    confirm_descs: &[],
+    line_inputs: &[],
+    texts: TEXTS,
+};
+static MIXED_ROUTES: [&PageRoute; 2] = [&ROUTE_MIXED, &TEXT_TARGET];
+static STATIC_ROUTES: [&PageRoute; 2] = [&ROUTE_STATIC, &TEXT_TARGET];
+
+const TEXTS: Texts = Texts {
+    return_text: "Back",
+    cancel_text: "Cancel",
+    confirm_text: "OK",
+    on_text: "On",
+    off_text: "Off",
+    message_title: "Message",
+};
+
+/// 在一台 128×64 的画布上起一个首页。
+fn home_ui(app: &'static App) -> KkUi<'static> {
+    set_font(&GLYPHS);
+    let buffer: &'static mut [u8] =
+        Box::leak(vec![0u8; Frame::buffer_len(128, 64)].into_boxed_slice());
+    let mut ui = KkUi::new(app, buffer, 128, 64);
+    assert_eq!(ui.init(), Status::Ok);
+    ui
+}
+
+/// 空按若干拍，返回画布快照。
+fn advance(ui: &mut KkUi<'static>, now: &mut u32, ticks: u32) -> Vec<u8> {
+    for _ in 0..ticks {
+        *now += 5;
+        ui.update(
+            *now,
+            Input {
+                keys: 0,
+                encoder_delta: 0,
+            },
+        );
+    }
+    ui.frame().buffer().to_vec()
+}
+
+/// 首页绘制动图而不止静态图标：没有输入也会随 24 fps 换帧重画。
+#[test]
+fn home_page_animates_its_icon() {
+    let mut ui = home_ui(&MIXED_APP);
+    let mut now = 0;
+    advance(&mut ui, &mut now, 40);
+    let first = advance(&mut ui, &mut now, 1);
+    let later = advance(&mut ui, &mut now, 40);
+    assert_ne!(first, later);
+    assert!(later.iter().any(|&byte| byte != 0));
+}
+
+/// 全是静态图标的首页没人按键就不重画。
+#[test]
+fn static_home_page_stays_quiet() {
+    let mut ui = home_ui(&STATIC_APP);
+    let mut now = 0;
+    advance(&mut ui, &mut now, 40);
+    ui.take_dirty_pages();
+    advance(&mut ui, &mut now, 40);
+    assert_eq!(ui.take_dirty_pages(), 0);
 }

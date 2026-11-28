@@ -1,7 +1,7 @@
 //! 首页：环形排列的图标选择器，切换时横向滑入。
 
 use crate::gfx::DrawMode;
-use crate::model::{HomePage, InputAction, InputEvent, PageRoute, PageType};
+use crate::model::{HomeIcon, HomePage, InputAction, InputEvent, PageRoute, PageType};
 use crate::ui::{HOME_MS, PageState, Runtime, ease_q12, lerp_q12, round_q8};
 
 /// 首页标签框的宽度上限：画布宽度留 4 px 边距。
@@ -66,9 +66,29 @@ fn home_values(rt: &mut Runtime, now: u32) -> (i32, i32) {
     }
 }
 
-/// 首页动画推进。
+/// 首页入口里有没有动图。
+#[cfg(feature = "anim-icons")]
+fn home_has_anim(state: &PageState) -> bool {
+    home_page(state)
+        .items
+        .iter()
+        .any(|item| matches!(&item.icon, HomeIcon::Anim(_)))
+}
+
+/// 首页动画推进：转场补间只播一次，动图按 24 fps 一直重画。
 pub(crate) fn home_animate(rt: &mut Runtime, now: u32) {
-    if rt.current_page_type() != PageType::Home || !rt.home_anim.active {
+    if rt.current_page_type() != PageType::Home {
+        return;
+    }
+    #[cfg(feature = "anim-icons")]
+    if home_has_anim(&rt.current) {
+        let frame = crate::widgets::anim_icons::frame_index(now);
+        if frame != rt.home_anim.anim_frame {
+            rt.home_anim.anim_frame = frame;
+            rt.dirty = true;
+        }
+    }
+    if !rt.home_anim.active {
         return;
     }
     rt.dirty = true;
@@ -152,7 +172,20 @@ pub(crate) fn home_draw(
         let delta = home_delta(index, state.selected, page.items.len() as u16);
         let x = screen_width / 2 - 16 + delta * 64 + icon_offset + x_offset;
         if x < clip_right && x + 32 > clip_x {
-            rt.frame.draw_xbm(x, 8 + dy, 32, 32, item.icon);
+            match item.icon {
+                HomeIcon::Static(bitmap) => rt.frame.draw_xbm(x, 8 + dy, 32, 32, bitmap),
+                #[cfg(feature = "anim-icons")]
+                HomeIcon::Anim(anim) => {
+                    let now = rt.last_update;
+                    crate::widgets::anim_icons::draw_anim_icon_at(
+                        &mut rt.frame,
+                        x,
+                        8 + dy,
+                        anim,
+                        now,
+                    )
+                }
+            }
         }
     }
 

@@ -1,7 +1,7 @@
 //! 应用描述表校验。
 
 use super::Runtime;
-use crate::model::{App, EVENT_NONE, MAX_BITS, MenuAction, PageRoute};
+use crate::model::{App, EVENT_NONE, HomeIcon, MAX_BITS, MenuAction, PageRoute};
 
 impl Runtime<'_> {
     /// 检查应用描述表，返回第一处不一致的位置。
@@ -18,7 +18,12 @@ impl Runtime<'_> {
             match route {
                 PageRoute::Home(page) => {
                     for item in page.items {
-                        if item.icon.is_empty() {
+                        let ok = match &item.icon {
+                            HomeIcon::Static(bitmap) => !bitmap.is_empty(),
+                            #[cfg(feature = "anim-icons")]
+                            HomeIcon::Anim(anim) => anim.frame_count() > 0,
+                        };
+                        if !ok {
                             return Err((Some(*route), index as u16));
                         }
                     }

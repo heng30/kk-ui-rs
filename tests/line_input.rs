@@ -42,7 +42,7 @@ static ROUTE_MENU: PageRoute = PageRoute::Menu(&MenuPage {
 
 static HOME_ITEMS: [HomeItem; 1] = [HomeItem {
     label: "Menu",
-    icon: &ICON,
+    icon: kk_ui::HomeIcon::Static(&ICON),
     target: &ROUTE_MENU,
 }];
 

@@ -1,8 +1,20 @@
-//! 小图标与指示器：尖角、电池、Wi-Fi、转圈。
+//! 小图标与指示器：尖角、电池、Wi-Fi、转圈，以及 32×32 的静态图标。
 //!
-//! 全部按整数坐标绘制，尺寸随参数缩放，和 [`Frame`] 的其它图元一样受裁剪窗口约束。
+//! 绘制助手全部按整数坐标画，尺寸随参数缩放，和 [`Frame`] 的其它图元一样受裁剪窗口约束。
+//! 静态图标是 `assets/icons/statics/` 里的 XBM 位图，用 [`Frame::draw_xbm`] 按 32×32 画。
 
 use crate::gfx::Frame;
+
+crate::static_icons! {
+    /// 32×32 XBM：设置。
+    ICON_SETTINGS = "settings",
+    /// 32×32 XBM：数据监测。
+    ICON_MONITOR = "monitor",
+    /// 32×32 XBM：波形。
+    ICON_WAVE = "wave",
+    /// 32×32 XBM：关于设备。
+    ICON_ABOUT = "about",
+}
 
 /// 圆周方向上 16 个等分点的单位偏移，放大 256 倍（Q8）。
 const DIRECTIONS: [(i16, i16); 16] = [

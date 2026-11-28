@@ -2,12 +2,15 @@
 //!
 //! 页面之间用 `&ROUTE_XXX` 句柄互相引用，`App.routes` 只是供初始化校验的无序清单。
 
+use kk_ui::anim_icons::ACTIVITY_32;
 use kk_ui::{
-    App, BitsBinding, BoolBinding, ChipBinding, ChoiceBinding, ConfirmDesc, HomeItem, HomePage,
-    InfoPage, InfoRow, IntBinding, LineInput, LineInputBinding, MenuAction, MenuItem, MenuPage,
-    PageRoute, Texts,
+    App, BitsBinding, BoolBinding, ChipBinding, ChoiceBinding, ConfirmDesc, HomeIcon, HomeItem,
+    HomePage, InfoPage, InfoRow, IntBinding, LineInput, LineInputBinding, MenuAction, MenuItem,
+    MenuPage, PageRoute, Texts,
+    icons::{ICON_ABOUT, ICON_MONITOR, ICON_SETTINGS, ICON_WAVE},
 };
 
+use super::anims::Anims;
 use super::gadgets::Gadgets;
 use super::icons::Icons;
 use super::math::MathPage;
@@ -52,10 +55,6 @@ kk_ui::event_ids! {
 
 // 图标是 32×32 XBM，每个 128 字节。
 kk_ui::icons! {
-    ICON_SETTINGS = "../assets/icon0.bin",
-    ICON_MONITOR = "../assets/icon1.bin",
-    ICON_WAVE = "../assets/icon2.bin",
-    ICON_ABOUT = "../assets/icon3.bin",
     ICON_MATH = "../assets/math.bin",
 }
 
@@ -155,6 +154,8 @@ pub(super) static ROUTE_MATH: PageRoute = PageRoute::Custom(&MATH);
 pub(super) static ROUTE_ICONS: PageRoute = PageRoute::Custom(&ICONS);
 /// 页面：控件绘制助手。
 pub(super) static ROUTE_GADGETS: PageRoute = PageRoute::Custom(&GADGETS);
+/// 页面：动图演示。
+pub(super) static ROUTE_ANIMS: PageRoute = PageRoute::Custom(&ANIMS);
 
 /// 整数编辑器绑定：屏幕亮度。
 pub(super) static INT_BRIGHTNESS: IntBinding = IntBinding {
@@ -242,31 +243,36 @@ pub(super) static CONFIRM_RESET: ConfirmDesc = ConfirmDesc {
     cancelled_event: EVENT_RESET_CANCELLED,
 };
 
-pub(super) static HOME_ITEMS: [HomeItem; 5] = [
+pub(super) static HOME_ITEMS: [HomeItem; 6] = [
     HomeItem {
         label: "设置",
-        icon: ICON_SETTINGS,
+        icon: HomeIcon::Static(ICON_SETTINGS),
         target: &ROUTE_SETTINGS,
     },
     HomeItem {
         label: "数据监测",
-        icon: ICON_MONITOR,
+        icon: HomeIcon::Static(ICON_MONITOR),
         target: &ROUTE_MONITOR,
     },
     HomeItem {
         label: "波形",
-        icon: ICON_WAVE,
+        icon: HomeIcon::Static(ICON_WAVE),
         target: &ROUTE_WAVE,
     },
     HomeItem {
         label: "数学",
-        icon: ICON_MATH,
+        icon: HomeIcon::Static(ICON_MATH),
         target: &ROUTE_MATH,
     },
     HomeItem {
         label: "关于设备",
-        icon: ICON_ABOUT,
+        icon: HomeIcon::Static(ICON_ABOUT),
         target: &ROUTE_ABOUT,
+    },
+    HomeItem {
+        label: "动图",
+        icon: HomeIcon::Anim(&ACTIVITY_32),
+        target: &ROUTE_ANIMS,
     },
 ];
 
@@ -452,8 +458,9 @@ pub(super) static WAVE: Wave = Wave::new();
 pub(super) static MATH: MathPage = MathPage::new();
 pub(super) static ICONS: Icons = Icons::new();
 pub(super) static GADGETS: Gadgets = Gadgets::new();
+pub(super) static ANIMS: Anims = Anims::new();
 
-pub(super) static ROUTES: [&PageRoute; 10] = [
+pub(super) static ROUTES: [&PageRoute; 11] = [
     &ROUTE_HOME,
     &ROUTE_SETTINGS,
     &ROUTE_MONITOR,
@@ -464,6 +471,7 @@ pub(super) static ROUTES: [&PageRoute; 10] = [
     &ROUTE_MATH,
     &ROUTE_ICONS,
     &ROUTE_GADGETS,
+    &ROUTE_ANIMS,
 ];
 
 /// 整个应用描述表。

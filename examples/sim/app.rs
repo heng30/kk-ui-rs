@@ -2,6 +2,7 @@
 //!
 //! 只依赖 `kk-ui-rs` 与 `core`，可以在主机上原样编入渲染测试工程。
 
+mod anims;
 mod autoplay;
 mod gadgets;
 mod handlers;

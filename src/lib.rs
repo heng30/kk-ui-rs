@@ -30,14 +30,15 @@ pub use font::{FULL_WIDTH, GLYPH_LEN, GLYPH_SIZE, Glyphs, set_font};
 pub use gfx::{DrawMode, Frame};
 pub use model::{
     App, BitsBinding, BoolBinding, ChipBinding, ChoiceBinding, ConfirmDesc, CustomPage, EVENT_NONE,
-    EventId, HomeItem, HomePage, InfoPage, InfoRow, Input, InputAction, InputEvent, InputSource,
-    IntBinding, ItemState, KEY_DOWN, KEY_OK, KEY_UP, LINE_INPUT_LEN, LineInput, LineInputBinding,
-    MAX_BITS, MenuAction, MenuItem, MenuPage, PageRoute, PageType, Shared, Text, Texts,
+    EventId, HomeIcon, HomeItem, HomePage, InfoPage, InfoRow, Input, InputAction, InputEvent,
+    InputSource, IntBinding, ItemState, KEY_DOWN, KEY_OK, KEY_UP, LINE_INPUT_LEN, LineInput,
+    LineInputBinding, MAX_BITS, MenuAction, MenuItem, MenuPage, PageRoute, PageType, Shared, Text,
+    Texts,
 };
 pub use ui::{CustomPageHandler, ErrorInfo, KkUi, PowerPhase, Runtime, Status, TransitionKind};
 pub use widgets::{
     Scrollbar, draw_battery, draw_caret, draw_chevron, draw_focus, draw_progress_bar, draw_spinner,
-    draw_switch, draw_wifi, utils::format_int,
+    draw_switch, draw_wifi, icons, utils::format_int,
 };
 
 #[cfg(feature = "anim-icons")]
@@ -133,7 +134,7 @@ macro_rules! menu_states {
 ///
 /// ```ignore
 /// kk_ui::icons! {
-///     ICON_SETTINGS = "assets/icon0.bin",
+///     ICON_BOOT = "assets/boot.bin",
 /// }
 /// ```
 #[macro_export]
@@ -142,6 +143,35 @@ macro_rules! icons {
         $(
             $(#[$attr])*
             pub static $name: &[u8] = include_bytes!($path);
+        )*
+    };
+}
+
+/// 批量声明 32×32 静态图标，写法是 `名字 = "文件名"`（不含 `.bin`）。
+///
+/// 每个静态只读一个 `.bin`：`<调用方 crate 根>/assets/icons/statics/<文件名>.bin`，路径由
+/// `env!("CARGO_MANIFEST_DIR")` 拼成，所以只对**调用方自己**的 `assets/` 有效。
+///
+/// 只能写在模块作用域：生成的是 `pub static`。
+///
+/// ```ignore
+/// kk_ui::static_icons! {
+///     /// 32×32 的齿轮。
+///     ICON_GEAR = "gear",
+/// }
+/// ```
+#[macro_export]
+macro_rules! static_icons {
+    ($($(#[$attr:meta])* $name:ident = $file:literal),* $(,)?) => {
+        $(
+            $(#[$attr])*
+            #[doc = concat!("32×32 XBM：`", $file, ".bin`。")]
+            pub static $name: &'static [u8] = include_bytes!(concat!(
+                env!("CARGO_MANIFEST_DIR"),
+                "/assets/icons/statics/",
+                $file,
+                ".bin"
+            ));
         )*
     };
 }

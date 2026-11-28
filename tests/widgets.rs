@@ -44,7 +44,7 @@ static MENU_ITEMS: [MenuItem; 3] = [
 
 static HOME_ITEMS: [kk_ui::HomeItem; 1] = [kk_ui::HomeItem {
     label: "Menu",
-    icon: &ICON,
+    icon: kk_ui::HomeIcon::Static(&ICON),
     target: &ROUTE_MENU,
 }];
 

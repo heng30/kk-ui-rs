@@ -27,6 +27,7 @@
 | `src/sim.rs` | 宿主机 eframe 模拟器（仅 `sim`，唯一用 `std` 的地方） |
 | `bin/kkui-tool.rs` | 资源工具：`font` 采字符生成字库、`icon` 图片转 XBM（仅 `tool`） |
 | `build.rs` + `build/bdf.rs` | 编译期从 `assets/fonts/unifont.bdf` 抠字模；`build/bdf.rs` 与工具共用（`include!` + `#[path]`），所以它内部不写 `use`、路径一律写全 |
+| `assets/icons/statics/` | 32×32 XBM 静态图标（`settings` / `monitor` / `wave` / `about`），由 `src/widgets/icons.rs` 的 `static_icons!` 导出成 `ICON_*` |
 | `assets/fonts/unifont.bdf` | 约 9 MB 的 Unifont 副本，入库，构建不依赖本机字体 |
 | `examples/sim/` | 完整示例：`main.rs` 接线 + `app.rs` 门面 + `app/{tables,handlers,autoplay,wave,math}.rs` |
 | `tests/` | 按主题分文件：`frame` / `text` / `cjk` / `custom` / `dialog` / `menu_scroll` / `widgets` / `sim` |
@@ -60,7 +61,8 @@
   `f32` 只允许出现在 `src/sim.rs`（egui 侧）。
 - **批量声明走库内宏**：`event_ids!`（按声明顺序生成从 1 开始的事件号）、`shared!`、`texts!`、
   `menu_states!`（定长状态数组，长度由递归 `@len` 数出来）、`icons!`（`include_bytes!` 路径相对
-  调用该宏的文件解析）、`anim_icons!`（`名字 = "文件名" @ 尺寸` 批量声明动图，路径靠 `CARGO_MANIFEST_DIR` 拼）。不要在示例或测试里再手写等价的静态声明。
+  调用该宏的文件解析）、`static_icons!`（`名字 = "文件名"` 批量声明 32×32 静态图标，路径靠 `CARGO_MANIFEST_DIR` 拼）、
+  `anim_icons!`（`名字 = "文件名" @ 尺寸` 批量声明动图，路径同样靠 `CARGO_MANIFEST_DIR` 拼）。不要在示例或测试里再手写等价的静态声明。
 - **`enum` ↔ 字符串转换用 `strum`**：不要手写 `as_str` / `from_str`。注意本 crate 默认无外部依赖，
   引入 `strum` 前先确认是否愿意破这个前提。
 - **`assets/` 是内嵌资源的唯一真源**：改 `assets/fonts/unifont.bdf` 就等于改二进制。
@@ -88,14 +90,15 @@
 - **`examples/` 顶层的每个 `.rs` 都是独立 example target**：辅助模块必须放在子目录里
   （`examples/sim/app/mod.rs` 那样由 `mod app;` 解析），直接在 `examples/` 顶层放没有 `main`
   的文件会编译失败。
-- **`icons!` 的路径相对源文件**：`tables.rs` 里写的是 `../assets/icon0.bin`，挪文件时一起改。
+- **`icons!` 的路径相对源文件**：`tables.rs` 里写的是 `../assets/math.bin`，挪文件时一起改。
 - **示例字库是编译期 `include_bytes!`**：给 `examples/sim` 加中文字符串后必须 `make font`
   重新生成 `examples/sim/assets/font/{font,width,cp}.bin`，否则新字符不显示。
   `make run` / `make snapshot` 会自动先跑这一步。
 - **改出"没有生效"的编译错误先怀疑 target 缓存**：旧 rlib 会报已经不存在的符号。换目录验证：
   `CARGO_TARGET_DIR=/tmp/kk-check cargo check --all-features`。
 - **`app.rs` 的注释声称有两份副本**：`examples/sim/app.rs` 顶部写着与 `ili9341-lcd-kkui/src/app.rs`
-  同源（图标各自一份 `assets/`）。那个目录不在本仓内，改动时按需确认。
+  同源（首页图标已收进库，只剩 `math.bin` 在示例自己的 `assets/`）。那个目录不在本仓内，改动时
+  按需确认。
 - **页面身份靠指针比较**：`core::ptr::eq` 判的是 `&'static PageRoute`。同一个页面声明成两个
   `static` 会被当成两个不同页面；`App.routes` 只是无序校验清单，漏列只会静默跳过校验。
 

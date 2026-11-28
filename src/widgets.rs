@@ -4,12 +4,12 @@
 //! 由子目录的 `mod.rs` 会话状态与分发，具体弹窗按类型分文件。
 
 mod focus;
-mod icons;
 mod progress_bar;
 mod scrollbar;
 mod switch;
 
 pub mod dialog;
+pub mod icons;
 pub mod pages;
 
 pub(crate) mod chip;
